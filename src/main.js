@@ -135,7 +135,7 @@ const lobby = createCoopLobby(LEVELS, {
     window.__game = game;
     mimi.group.visible = true;
     mimi.reset();
-    startAt(levelIndex);
+    startAt(levelIndex, true);
     if (coopRole === 'host') {
       lobby.session.sendState(exportCoopSnapshot(game));
     }
@@ -227,7 +227,7 @@ function showLevel() {
   hud.toast(t('hud.level', { n: game.levelIndex + 1, name: t(game.level.name) }), 1600, 'intro');
 }
 
-function startAt(index = game.levelIndex) {
+function startAt(index = game.levelIndex, forceRebuild = false) {
   clearActionTimers();
   resetEffects();
   transitioning = false;
@@ -237,7 +237,7 @@ function startAt(index = game.levelIndex) {
   closeMap(false);
   playing = true;
   document.body.classList.add('playing');
-  if (changed) rebuildWorld();
+  if (changed || forceRebuild) rebuildWorld();
   else {
     momo.reset();
     if (game.coop) {
@@ -376,6 +376,7 @@ function closeMap(shouldRebuild = true) {
 
 $('play').addEventListener('click', () => {
   requestGameFullscreen();
+  const resetFromCoop = Boolean(coopRole);
   if (coopRole) {
     lobby.session.leave();
     coopRole = null;
@@ -383,7 +384,7 @@ $('play').addEventListener('click', () => {
     window.__game = game;
     mimi.group.visible = false;
   }
-  startAt(game.levelIndex);
+  startAt(game.levelIndex, resetFromCoop);
 });
 $('open-coop').addEventListener('click', () => {
   initAudio();
