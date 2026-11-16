@@ -14,6 +14,7 @@ describe('roomCode helpers', () => {
     expect(parseRoomCodeInput('https://dont-trust-anyone.inkfintystudio-store.workers.dev/?room=482-910-375')).toBe('482910375');
     expect(parseRoomCodeInput('Join me! https://inkfinitystudio.store/game-room?room=482910375')).toBe('482910375');
     expect(parseRoomCodeInput('?room=12345')).toBeNull();
+    expect(parseRoomCodeInput('?uid=123456789&level=5')).toBeNull();
     expect(parseRoomCodeInput('not-a-code')).toBeNull();
   });
 

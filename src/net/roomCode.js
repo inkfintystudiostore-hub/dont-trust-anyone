@@ -26,7 +26,7 @@ export function parseRoomCodeInput(raw) {
   if (!trimmed) return null;
 
   const queryStart = trimmed.indexOf('?');
-  if (queryStart >= 0 || /^room=/i.test(trimmed)) {
+  if (queryStart >= 0 || /(?:^|&)room=/i.test(trimmed)) {
     const rawQuery = queryStart >= 0 ? trimmed.slice(queryStart + 1).split('#')[0] : trimmed;
     const queryStr = rawQuery.split(/\s+/)[0] ?? rawQuery;
     try {
@@ -35,8 +35,9 @@ export function parseRoomCodeInput(raw) {
         const digits = roomParam.replace(/\D/g, '');
         return digits.length === ROOM_CODE_LENGTH ? digits : null;
       }
+      return null;
     } catch {
-      // Fall through to pattern matching.
+      return null;
     }
   }
 

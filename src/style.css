@@ -15,10 +15,11 @@
 body.world-2 { --sky-top: #ffe0ba; --sky-bottom: #fff6ea; }
 body.world-3 { --sky-top: #d7c4f2; --sky-bottom: #f6efff; }
 body.world-4 { --sky-top: #a89fe6; --sky-bottom: #ffe2ec; }
+body.world-5 { --sky-top: #ffd1dc; --sky-bottom: #fff1f5; }
 
 * { box-sizing: border-box; }
 html, body {
-  margin: 0; height: 100%; overflow: hidden;
+  margin: 0; width: 100%; height: 100%; height: 100dvh; overflow: hidden;
   background: linear-gradient(180deg, var(--sky-top), var(--sky-bottom) 70%);
   color: var(--ink); font-family: var(--font-body);
   -webkit-user-select: none; user-select: none; touch-action: none;
@@ -132,7 +133,7 @@ canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
 .map-card { width: min(520px, 100%); padding: 18px 20px 16px; }
 .map-head { display: flex; justify-content: space-between; align-items: center; text-align: left; margin-bottom: 10px; }
 .map-head h2 { margin: 0; font: 800 22px var(--font-display); }
-.world-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+.world-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 6px; margin-bottom: 10px; }
 .tab {
   padding: 7px 6px; border-radius: 8px; border: 1px solid #d9c9bb;
   background: #fff; font: 700 12.5px var(--font-display); cursor: pointer; color: var(--ink);
@@ -170,16 +171,47 @@ h1 { font: 800 clamp(32px, 8vw, 46px)/1.02 var(--font-display); margin: 0 0 10px
 .keys { font-size: 13px; color: #6b5f58; margin: 8px 0 0; line-height: 1.5; }
 kbd { font: 600 12px var(--font-mono); background: #fff; border: 1px solid #d9c9bb; border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; }
 
-#touch { position: fixed; inset: auto 0 0 0; padding: 0 16px 16px; display: flex; gap: 12px; align-items: flex-end; pointer-events: none; z-index: 10; }
+body:not(.playing) #touch { display: none !important; }
+#touch {
+  position: fixed; inset: auto 0 0 0;
+  padding: 0 max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  display: flex; justify-content: space-between; align-items: flex-end; gap: 12px;
+  pointer-events: none; z-index: 10;
+}
+.joy-zone {
+  pointer-events: auto; width: 146px; height: 146px; display: grid; place-items: center;
+  touch-action: none; position: relative; flex-shrink: 0;
+}
+.joy-base {
+  width: 118px; height: 118px; border-radius: 50%; position: relative; display: grid; place-items: center;
+  border: 2px solid rgba(31, 25, 22, 0.25);
+  background: radial-gradient(circle at 50% 45%, rgba(255, 251, 247, 0.88), rgba(242, 226, 214, 0.72));
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 2px 8px rgba(31, 25, 22, 0.08), 0 8px 22px rgba(31, 25, 22, 0.14);
+  transition: border-color .15s var(--ease), transform .15s var(--ease);
+}
+.joy-zone.active .joy-base { border-color: var(--crimson); transform: scale(1.03); }
+.joy-knob {
+  width: 54px; height: 54px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle at 35% 30%, #fff, #f4dfd5);
+  border: 2.5px solid var(--crimson);
+  box-shadow: 0 5px 14px rgba(139, 13, 26, 0.28);
+  will-change: transform;
+}
+.joy-zone:not(.active) .joy-knob { transition: transform .14s var(--ease); }
+.joy-arrows { position: absolute; font: 700 11px var(--font-display); color: rgba(31, 25, 22, 0.34); pointer-events: none; letter-spacing: 1px; }
+.joy-down-hint { position: absolute; bottom: 8px; font: 700 10px var(--font-display); color: rgba(31, 25, 22, 0.3); pointer-events: none; transition: color .12s var(--ease), transform .12s var(--ease); }
+.joy-down-hint.on { color: var(--crimson); transform: scale(1.2); }
+.touch-actions { display: flex; align-items: flex-end; gap: 12px; }
 #touch button {
   pointer-events: auto; display: grid; place-items: center; width: 68px; height: 68px; border-radius: 50%;
   border: 1.5px solid rgba(31, 25, 22, 0.35); background: rgba(255, 251, 247, 0.9); backdrop-filter: blur(6px);
   color: var(--ink); touch-action: none; box-shadow: 0 6px 16px rgba(31, 25, 22, 0.14);
   transition: transform .08s var(--ease);
 }
-#touch .mini { width: 52px; height: 52px; margin-left: auto; }
-#touch .jump { background: var(--crimson); color: #fff; border-color: var(--crimson); width: 80px; height: 80px; box-shadow: 0 8px 20px rgba(139, 13, 26, 0.3); }
+#touch .mini { width: 52px; height: 52px; }
+#touch .jump { background: var(--crimson); color: #fff; border-color: var(--crimson); width: 82px; height: 82px; box-shadow: 0 8px 20px rgba(139, 13, 26, 0.3); }
 #touch button.on { transform: scale(.91); }
-body.touch .bubble { bottom: 110px; }
+body.touch .bubble { bottom: 168px; }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

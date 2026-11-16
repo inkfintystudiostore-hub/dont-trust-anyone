@@ -9,13 +9,17 @@ import { buildWorld } from './render/world.js';
 import { createMomo } from './render/momo.js';
 import { createConfetti, createDust, createAmbientMotes } from './render/fx.js';
 import { createDiorama } from './render/diorama.js';
-import { input, bindInput, pollGamepad } from './input.js';
+import { input, bindInput, pollGamepad, clearTouchInput } from './input.js';
 import { initAudio, sfx, startMusic, stopMusic, duckMusic, setMuted } from './audio.js';
 import { loadSave, saveProgress, recordWin } from './save.js';
 import { parseRoomCodeInput } from './net/roomCode.js';
 import { createCoopLobby } from './ui/lobby.js';
 import { hud } from './ui/hud.js';
 import { t, applyI18n } from './i18n.js';
+import {
+  isFullscreenSupported, isInFullscreen, requestGameFullscreen,
+  subscribeFullscreenChange, toggleGameFullscreen,
+} from './utils/fullscreen.js';
 
 const FIXED = 1 / 60;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -25,6 +29,9 @@ applyI18n();
 let save = loadSave();
 setMuted(save.muted);
 hud.muteIcon(save.muted);
+hud.fullscreenIcon(isInFullscreen());
+if (!isFullscreenSupported()) hud.hideFullscreenBtn();
+subscribeFullscreenChange((fs) => hud.fullscreenIcon(fs));
 
 const canvas = $('game');
 const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -61,6 +68,7 @@ try {
     momo: 0.95, mimi: 0.95, darwaza: 1.35, gappu_sign: 1.25, kabootar: 0.7, lollipop_tree: 2.4, cotton_cloud: 1, boulder: 1,
     banana_peel: 0.42, rubber_chicken: 0.75, boxing_glove: 0.75, checkpoint_flag: 1.1,
     gift_box: 0.9, toy_robot: 0.95, cute_ghost: 0.95,
+    coop_switch: 0.45, golden_key: 0.28, ticking_bomb: 0.85,
   });
 } catch (err) {
   const titleEl = $('loading').querySelector('h1');
@@ -71,8 +79,11 @@ $('loading').hidden = true;
 
 const qsParams = new URLSearchParams(location.search);
 const qsLevel = Number(qsParams.get('level'));
-const qsRoom = parseRoomCodeInput(location.search);
-const startLevel = qsLevel ? Math.max(0, Math.min(LEVELS.length - 1, qsLevel - 1)) : Math.min(save.unlocked, LEVELS.length - 1);
+const qsRoom = parseRoomCodeInput(qsParams.get('room'));
+const worldIndices = (w) => LEVELS.map((l, i) => ((l.world ?? 1) - 1 === w ? i : -1)).filter((i) => i >= 0);
+const lastSoloLevel = LEVELS.reduce((accIdx, l, idx) => (l.coopOnly ? accIdx : idx), 0);
+const rawStart = qsLevel ? Math.max(0, Math.min(LEVELS.length - 1, qsLevel - 1)) : Math.min(save.unlocked, lastSoloLevel);
+const startLevel = LEVELS[rawStart]?.coopOnly ? lastSoloLevel : rawStart;
 if (qsLevel && startLevel > save.unlocked) save = { ...save, unlocked: startLevel };
 
 let game = createGame(LEVELS, startLevel);
@@ -90,10 +101,14 @@ window.__game = game;
 let playing = false;
 let transitioning = false;
 let mapOpen = false;
-let mapWorld = Math.floor(game.levelIndex / 10);
+let mapWorld = (LEVELS[game.levelIndex]?.world ?? 1) - 1;
 let mapSelected = game.levelIndex;
 let coopRole = null; // null | 'host' | 'guest'
-const guestInput = { left: false, right: false, down: false, jump: false };
+let coopStartIdx = 35;
+let prevGuestJump = false;
+let guestJumpPending = false;
+let lastHudDeaths = -1;
+const guestInput = { left: false, right: false, moveX: 0, down: false, jump: false };
 let lastSnapTime = 0;
 let lastSentSig = '';
 let lastGuestSentAt = 0;
@@ -110,7 +125,12 @@ const camLook = new Vector3();
 const lobby = createCoopLobby(LEVELS, {
   onMatchStart(levelIndex, snap) {
     coopRole = snap?.isHost ? 'host' : 'guest';
+    coopStartIdx = LEVELS[levelIndex]?.coopOnly ? 35 : 0;
     guestInput.left = guestInput.right = guestInput.down = guestInput.jump = false;
+    guestInput.moveX = 0;
+    prevGuestJump = false;
+    guestJumpPending = false;
+    lastHudDeaths = -1;
     game = createGame(LEVELS, levelIndex, { coop: true });
     window.__game = game;
     mimi.group.visible = true;
@@ -124,19 +144,30 @@ const lobby = createCoopLobby(LEVELS, {
     if (coopRole !== 'host') return;
     guestInput.left = !!msg.left;
     guestInput.right = !!msg.right;
+    guestInput.moveX = Number.isFinite(Number(msg.moveX)) ? Math.max(-1, Math.min(1, Number(msg.moveX))) : 0;
     guestInput.down = !!msg.down;
-    guestInput.jump = !!msg.jump;
+    const j = !!msg.jump;
+    if (j && !prevGuestJump) guestJumpPending = true;
+    prevGuestJump = j;
+    guestInput.jump = j;
   },
   onStateSync(snap) {
     if (coopRole !== 'guest' || !game.coop) return;
-    const levelChanged = snap.levelIndex !== game.levelIndex;
-    applyCoopSnapshot(game, snap);
+    const { levelChanged, respawned } = applyCoopSnapshot(game, snap);
     lastSnapTime = time;
     if (levelChanged && !transitioning) {
       rebuildWorld();
       showLevel();
+    } else if (respawned && !transitioning) {
+      momo.reset();
+      mimi.reset();
+      hud.doorWait(false);
+      world.snap(game);
     }
-    hud.deaths(game.deaths);
+    if (game.deaths !== lastHudDeaths) {
+      lastHudDeaths = game.deaths;
+      hud.deaths(game.deaths);
+    }
   },
   onEventSync(ev) {
     if (coopRole !== 'guest') return;
@@ -205,6 +236,7 @@ function startAt(index = game.levelIndex) {
   if (changed) loadLevel(game, index);
   closeMap(false);
   playing = true;
+  document.body.classList.add('playing');
   if (changed) rebuildWorld();
   else {
     momo.reset();
@@ -220,6 +252,8 @@ function startAt(index = game.levelIndex) {
   $('coop').hidden = true;
   $('end').hidden = true;
   hud.show();
+  hud.coopControls(Boolean(coopRole));
+  lastHudDeaths = game.deaths;
   hud.deaths(game.deaths);
   showLevel();
 }
@@ -233,9 +267,10 @@ function renderMapGrid(focusSelected = false) {
   for (const tab of $('world-tabs').querySelectorAll('.tab')) {
     tab.classList.toggle('on', Number(tab.dataset.w) === mapWorld);
   }
-  const base = mapWorld * 10;
+  const indices = worldIndices(mapWorld);
+  if (!indices.includes(mapSelected) && indices.length) mapSelected = indices[0];
   let focusTarget = null;
-  for (let i = base; i < Math.min(LEVELS.length, base + 10); i++) {
+  for (const i of indices) {
     const btn = document.createElement('button');
     btn.className = 'lvl-btn';
     if (i === mapSelected) { btn.classList.add('on'); focusTarget = btn; }
@@ -249,7 +284,7 @@ function renderMapGrid(focusSelected = false) {
     const sub = document.createElement('small');
     const best = save.bestDeaths[i];
     if (best !== undefined) sub.innerHTML = `${ICO_CHECK} ${best}`;
-    else sub.textContent = locked ? '—' : 'New';
+    else sub.textContent = locked ? '—' : (LEVELS[i]?.coopOnly ? '2P' : 'New');
     btn.append(top, sub);
 
     btn.addEventListener('click', () => {
@@ -261,8 +296,38 @@ function renderMapGrid(focusSelected = false) {
   const sel = LEVELS[mapSelected];
   $('map-selected-title').textContent = sel ? `Level ${mapSelected + 1}: ${t(sel.name)}` : '';
   $('map-play').disabled = !coopRole && mapSelected < 30 && mapSelected > save.unlocked;
-  diorama.sync(save, mapSelected);
+  diorama.sync(save, mapSelected, Boolean(coopRole));
   if (focusSelected && focusTarget) focusTarget.focus();
+}
+
+function setPlaying(v) {
+  playing = v;
+  document.body.classList.toggle('playing', v);
+  if (!v) clearTouchInput();
+}
+
+function leaveCoopToMenu() {
+  clearActionTimers();
+  resetEffects();
+  transitioning = false;
+  hud.cancelIris();
+  stopMusic();
+  setPlaying(false);
+  if (coopRole) {
+    lobby.session.leave();
+    coopRole = null;
+  }
+  game = createGame(LEVELS, startLevel);
+  window.__game = game;
+  mimi.group.visible = false;
+  rebuildWorld();
+  hud.coopControls(false);
+  hud.hide();
+  $('end').hidden = true;
+  $('map').hidden = true;
+  $('coop').hidden = true;
+  $('menu').hidden = false;
+  $('play').focus();
 }
 
 function openMap() {
@@ -276,9 +341,9 @@ function openMap() {
   hud.cancelIris();
   stopMusic();
   mapOpen = true;
-  playing = false;
+  setPlaying(false);
   mapSelected = game.levelIndex;
-  mapWorld = Math.floor(mapSelected / 10);
+  mapWorld = (LEVELS[mapSelected]?.world ?? 1) - 1;
   $('menu').hidden = true;
   $('end').hidden = true;
   hud.hide();
@@ -292,6 +357,7 @@ function openMap() {
   diorama.show(true);
   renderMapGrid();
   $('map').hidden = false;
+  $('map-play').focus();
 }
 
 function closeMap(shouldRebuild = true) {
@@ -309,6 +375,7 @@ function closeMap(shouldRebuild = true) {
 }
 
 $('play').addEventListener('click', () => {
+  requestGameFullscreen();
   if (coopRole) {
     lobby.session.leave();
     coopRole = null;
@@ -319,12 +386,18 @@ $('play').addEventListener('click', () => {
   startAt(game.levelIndex);
 });
 $('open-coop').addEventListener('click', () => {
+  initAudio();
+  requestGameFullscreen();
   $('menu').hidden = true;
-  lobby.openCreate(game.levelIndex);
+  lobby.openCreate(game.level.coopOnly ? game.levelIndex : undefined);
 });
 $('open-map').addEventListener('click', openMap);
 $('end-map').addEventListener('click', openMap);
 $('btn-map').addEventListener('click', openMap);
+$('btn-leave').addEventListener('click', leaveCoopToMenu);
+$('end-leave').addEventListener('click', leaveCoopToMenu);
+$('coop-start').addEventListener('click', () => { initAudio(); requestGameFullscreen(); });
+$('coop-join-btn').addEventListener('click', () => { initAudio(); requestGameFullscreen(); });
 $('map-close').addEventListener('click', () => {
   if (coopRole) {
     lobby.session.leave();
@@ -335,8 +408,15 @@ $('map-close').addEventListener('click', () => {
   }
   closeMap(true);
   $('menu').hidden = false;
+  $('play').focus();
 });
 $('map-play').addEventListener('click', () => {
+  requestGameFullscreen();
+  if (!coopRole && LEVELS[mapSelected]?.coopOnly) {
+    closeMap(false);
+    lobby.openCreate(mapSelected);
+    return;
+  }
   if (coopRole === 'host') {
     lobby.session.setLevel(mapSelected);
     startAt(mapSelected);
@@ -349,7 +429,7 @@ $('map-play').addEventListener('click', () => {
 for (const tab of $('world-tabs').querySelectorAll('.tab')) {
   tab.addEventListener('click', () => {
     mapWorld = Number(tab.dataset.w);
-    mapSelected = mapWorld * 10;
+    mapSelected = worldIndices(mapWorld)[0] ?? 0;
     renderMapGrid();
   });
 }
@@ -373,8 +453,10 @@ function handleRestart(fromRemote = false) {
   }
 }
 $('btn-restart').addEventListener('click', handleRestart);
+$('btn-fullscreen').addEventListener('click', () => { toggleGameFullscreen(); });
 $('btn-mute').addEventListener('click', () => {
   save = { ...save, muted: !save.muted };
+  if (!save.muted) initAudio();
   setMuted(save.muted);
   hud.muteIcon(save.muted);
   saveProgress(save);
@@ -387,23 +469,22 @@ addEventListener('keydown', (e) => {
       startAt(game.levelIndex);
     } else if (playing && !transitioning) {
       e.preventDefault();
-      openMap();
+      if (coopRole === 'guest') leaveCoopToMenu();
+      else openMap();
     }
   }
 });
 
 $('again').addEventListener('click', () => {
+  requestGameFullscreen();
   clearActionTimers();
   resetEffects();
   if (coopRole === 'host') {
-    lobby.session.setLevel(0);
-    lobby.session.startMatch(0);
+    lobby.session.setLevel(coopStartIdx);
+    lobby.session.startMatch(coopStartIdx);
     return;
   }
-  if (coopRole === 'guest') {
-    lobby.session.sendRestart();
-    return;
-  }
+  if (coopRole === 'guest') return;
   game.deaths = 0;
   game.finished = false;
   loadLevel(game, 0);
@@ -444,6 +525,27 @@ function onEvent(e) {
       hud.toast(`${who} door pe hai!`, 1200);
       break;
     }
+    case 'doorLocked':
+      sfx.locked();
+      hud.toast(t('coop.doorLocked'), 1150);
+      break;
+    case 'key':
+      sfx.key();
+      confetti.burst(e.x, e.y + 0.35);
+      hud.toast(t('coop.keyGot', { left: e.left }), 1150);
+      break;
+    case 'gateOpen':
+      sfx.gateOpen();
+      break;
+    case 'defused':
+      sfx.defused();
+      confetti.burst(e.x, e.y + 0.45);
+      hud.toast(t('coop.defused'), 1150);
+      break;
+    case 'boom':
+      sfx.boom();
+      confetti.burst(e.x, e.y + 0.5);
+      break;
     case 'trap':
       if (e.kind === 'bananaPeel') sfx.slip();
       else if (e.kind === 'rubberChicken') sfx.squeak();
@@ -534,9 +636,9 @@ function onEvent(e) {
       hud.toast(e.deaths ? t('hud.cleared', { n: e.deaths }) : t('hud.flawless'), 1400);
       clearTimeout(pendingWinTimer);
       if (game.finished) {
-        playing = false;
+        setPlaying(false);
         stopMusic();
-        pendingWinTimer = setTimeout(() => { hud.hide(); hud.end(game.deaths); }, 900);
+        pendingWinTimer = setTimeout(() => { hud.hide(); hud.end(game.deaths, coopRole === 'guest'); }, 900);
         break;
       }
       transitioning = true;
@@ -584,7 +686,8 @@ function frame(now) {
 
   if (!transitioning) {
     if (coopRole === 'guest') {
-      const sig = `${+input.left}${+input.right}${+input.down}${+input.jump}`;
+      const qx = Math.round((input.moveX || 0) * 20) / 20;
+      const sig = `${+input.left}${+input.right}${qx}${+input.down}${+input.jump}`;
       if (playing && (sig !== lastSentSig || time - lastGuestSentAt > 0.08)) {
         lastSentSig = sig;
         lastGuestSentAt = time;
@@ -597,8 +700,9 @@ function frame(now) {
       while (acc >= FIXED && !transitioning && !game.finished) {
         acc -= FIXED;
         const stepIn = coopRole === 'host'
-          ? (playing ? [input, guestInput] : [IDLE, IDLE])
+          ? (playing ? [input, { ...guestInput, jump: guestInput.jump || guestJumpPending }] : [IDLE, IDLE])
           : (playing ? input : IDLE);
+        guestJumpPending = false;
         const evs = step(game, stepIn, FIXED);
         for (let i = 0; i < evs.length; i++) {
           const ev = evs[i];
@@ -641,7 +745,7 @@ function frame(now) {
       mimi.update(p1, dt, time, game.dead && game.deathVictim === 1, alpha, -0.16);
       camFocusX = (rx0 + rx1) * 0.5;
       camFocusY = (ry0 + ry1) * 0.5;
-      spreadZ = Math.min(10, Math.abs(rx0 - rx1) * 0.85);
+      spreadZ = Math.min(14, Math.abs(rx0 - rx1) * 1.05);
     }
 
     world.update(game, dt, time, alpha);

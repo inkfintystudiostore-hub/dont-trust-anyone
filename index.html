@@ -2,7 +2,7 @@
 <html lang="hi">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Don't Trust Anyone</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='34' r='24' fill='%23fffbf7' stroke='%238b0d1a' stroke-width='5'/><circle cx='24' cy='32' r='4' fill='%231f1916'/><circle cx='40' cy='32' r='4' fill='%231f1916'/></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,7 +23,11 @@
       <button class="pill btn-pill" id="btn-restart" title="Restart (R)" aria-label="Restart">
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
       </button>
-      <button class="pill btn-pill" id="btn-mute" title="Sound" aria-label="Sound"></button>
+      <button class="pill btn-pill" id="btn-mute" title="Sound" aria-label="Sound" aria-pressed="false"></button>
+      <button class="pill btn-pill" id="btn-fullscreen" title="Fullscreen" aria-label="Fullscreen" aria-pressed="false"></button>
+      <button class="pill btn-pill" id="btn-leave" hidden title="Leave Co-op Room" aria-label="Leave Co-op Room">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      </button>
     </div>
     <div class="hud-right">
       <div class="pill door-badge" id="door-badge" hidden></div>
@@ -39,13 +43,13 @@
   </div>
 
   <div id="rotate-hint" hidden data-i18n="hud.rotate"></div>
-  <div id="taunt" class="bubble" hidden>
+  <div id="taunt" class="bubble" role="status" aria-live="polite" hidden>
     <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H7l-4 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/></svg>
     <span id="taunt-text"></span>
   </div>
-  <div id="toast" hidden></div>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
 
-  <section id="menu" class="overlay" hidden>
+  <section id="menu" class="overlay" role="dialog" aria-modal="true" aria-label="Main Menu" hidden>
     <div class="card">
       <h1 data-i18n="menu.title"></h1>
       <p class="sub" data-i18n="menu.sub"></p>
@@ -56,7 +60,7 @@
     </div>
   </section>
 
-  <section id="coop" class="overlay" hidden>
+  <section id="coop" class="overlay" role="dialog" aria-modal="true" aria-label="2-Player Co-op Lobby" hidden>
     <div class="card coop-card">
       <div class="map-head">
         <div><h2 data-i18n="coop.title"></h2></div>
@@ -86,18 +90,18 @@
 
       <div id="coop-join-pane" hidden>
         <div class="join-row">
-          <input id="coop-join-input" class="field" type="text" autocomplete="off" placeholder="482-910-375 ya invite link">
+          <input id="coop-join-input" class="field" type="text" autocomplete="off" aria-label="Room code or invite link" placeholder="482-910-375 ya invite link">
           <button id="coop-join-btn" class="btn join-go" type="button" data-i18n="coop.joinBtn"></button>
         </div>
       </div>
 
       <div id="coop-roster" class="roster"></div>
-      <p id="coop-status" class="coop-status"></p>
+      <p id="coop-status" class="coop-status" role="status" aria-live="polite"></p>
       <button id="coop-start" class="btn" type="button" hidden data-i18n="coop.startBtn"></button>
     </div>
   </section>
 
-  <section id="map" class="overlay map-overlay" hidden>
+  <section id="map" class="overlay map-overlay" role="dialog" aria-modal="true" aria-label="Level Map" hidden>
     <div class="card map-card">
       <div class="map-head">
         <div>
@@ -112,26 +116,36 @@
         <button class="tab" data-w="1" data-i18n="world.2"></button>
         <button class="tab" data-w="2" data-i18n="world.3"></button>
         <button class="tab" data-w="3" data-i18n="world.4"></button>
+        <button class="tab" data-w="4" data-i18n="world.5"></button>
       </div>
       <div class="level-grid" id="level-grid"></div>
       <button id="map-play" class="btn" data-i18n="map.play"></button>
     </div>
   </section>
 
-  <section id="end" class="overlay" hidden>
+  <section id="end" class="overlay" role="dialog" aria-modal="true" aria-label="Victory Screen" hidden>
     <div class="card">
       <h1 data-i18n="end.title"></h1>
       <p class="sub" data-i18n="end.sub"></p>
+      <p id="end-wait-guest" class="sub" hidden data-i18n="coop.waitAgain"></p>
       <button id="again" class="btn" data-i18n="end.again"></button>
       <button id="end-map" class="btn ghost" data-i18n="menu.map"></button>
+      <button id="end-leave" class="btn ghost" hidden data-i18n="coop.leave"></button>
     </div>
   </section>
 
   <div id="touch" hidden>
-    <button data-k="left" aria-label="Left"><svg class="ico ico-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
-    <button data-k="right" aria-label="Right"><svg class="ico ico-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
-    <button data-k="restart" class="mini" aria-label="Restart"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
-    <button data-k="jump" class="jump" aria-label="Jump"><svg class="ico ico-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg></button>
+    <div id="joy-zone" class="joy-zone" role="group" aria-label="Move Joystick">
+      <div id="joy-base" class="joy-base">
+        <span class="joy-arrows" aria-hidden="true">◀&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▶</span>
+        <span id="joy-down-hint" class="joy-down-hint" aria-hidden="true">▼</span>
+        <div id="joy-knob" class="joy-knob"></div>
+      </div>
+    </div>
+    <div class="touch-actions">
+      <button data-k="restart" class="mini" aria-label="Restart"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+      <button data-k="jump" class="jump" aria-label="Jump"><svg class="ico ico-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg></button>
+    </div>
   </div>
 
   <div id="loading" class="overlay"><div class="card"><h1 data-i18n="loading.title"></h1></div></div>

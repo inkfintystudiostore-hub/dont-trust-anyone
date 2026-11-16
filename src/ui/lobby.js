@@ -13,6 +13,7 @@ export function createCoopLobby(levels, callbacks) {
   let currentCode = null;
   let latestSnapshot = null;
   let copyTimer = 0;
+  let reserveSeq = 0;
 
   const selectEl = $('coop-level');
   selectEl.innerHTML = '';
@@ -42,6 +43,10 @@ export function createCoopLobby(levels, callbacks) {
       selectEl.value = String(snap.levelIndex);
       renderRoster(snap);
       callbacks.onSnapshot?.(snap);
+      if (snap.started && !$('coop').hidden) {
+        $('coop').hidden = true;
+        callbacks.onMatchStart?.(snap.levelIndex, snap);
+      }
     },
     onStarted(levelIndex) {
       $('coop').hidden = true;
@@ -105,12 +110,18 @@ export function createCoopLobby(levels, callbacks) {
     renderRoster(latestSnapshot);
   }
 
-  async function hostNewRoom(defaultLevelIndex = 0) {
+  const defaultCoopIdx = levels.length > 35 ? 35 : 0;
+  async function hostNewRoom(defaultLevelIndex = defaultCoopIdx) {
+    const reqId = ++reserveSeq;
+    if (currentCode || session.isConnected()) session.leave();
+    latestSnapshot = null;
+    currentCode = null;
     setTab('create');
     $('coop-code').textContent = '…';
     $('coop-status').textContent = 'Reserving 9-digit room…';
     selectEl.value = String(defaultLevelIndex);
     const res = await reserveCoopRoom(defaultLevelIndex);
+    if (reqId !== reserveSeq || $('coop').hidden || tab !== 'create') return;
     if (!res.ok) {
       $('coop-code').textContent = '--- --- ---';
       $('coop-status').textContent = res.error;
@@ -131,6 +142,12 @@ export function createCoopLobby(levels, callbacks) {
     if (!clean) {
       $('coop-status').textContent = 'Valid 9-digit code ya invite link daalo.';
       return;
+    }
+    reserveSeq++;
+    if (currentCode && currentCode !== clean) {
+      session.leave();
+      latestSnapshot = null;
+      currentCode = null;
     }
     setTab('join');
     $('coop-join-input').value = formatRoomCode(clean);
@@ -153,9 +170,23 @@ export function createCoopLobby(levels, callbacks) {
   }
 
   $('coop-tab-create').addEventListener('click', () => {
-    if (tab !== 'create') hostNewRoom(Number(selectEl.value) || 0);
+    if (tab !== 'create') {
+      const idx = selectEl.value !== '' ? Number(selectEl.value) : defaultCoopIdx;
+      hostNewRoom(Number.isFinite(idx) ? idx : defaultCoopIdx);
+    }
   });
-  $('coop-tab-join').addEventListener('click', () => setTab('join'));
+  $('coop-tab-join').addEventListener('click', () => {
+    if (tab === 'join') return;
+    reserveSeq++;
+    if (currentCode || session.isConnected()) {
+      session.leave();
+      latestSnapshot = null;
+      currentCode = null;
+      $('coop-code').textContent = '--- --- ---';
+    }
+    setTab('join');
+    $('coop-status').textContent = '';
+  });
   $('coop-name').addEventListener('change', () => {
     const name = $('coop-name').value.trim();
     saveCoopName(name);
@@ -181,12 +212,14 @@ export function createCoopLobby(levels, callbacks) {
   });
 
   return {
-    openCreate(defaultLevelIndex = 0) {
+    openCreate(defaultLevelIndex = defaultCoopIdx) {
       $('coop').hidden = false;
+      $('coop-name').focus();
       hostNewRoom(defaultLevelIndex);
     },
     openJoin(prefillCode) {
       $('coop').hidden = false;
+      $('coop-name').focus();
       joinByCode(prefillCode);
     },
     session,

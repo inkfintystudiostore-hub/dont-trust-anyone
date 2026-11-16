@@ -223,7 +223,12 @@ export class DontTrustRoomDO extends DurableObject {
     server.serializeAttachment({ playerId });
 
     await this.saveRoom(updated);
-    queueMicrotask(() => this.broadcastSnapshots(updated));
+    queueMicrotask(() => {
+      this.broadcastSnapshots(updated);
+      if (updated.started && server.readyState === WebSocket.OPEN) {
+        server.send(JSON.stringify({ type: 'started', levelIndex: updated.levelIndex }));
+      }
+    });
 
     return new Response(null, { status: 101, webSocket: client });
   }

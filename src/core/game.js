@@ -19,6 +19,7 @@ function createPlayerState() {
     x: 0, y: 0, prevX: 0, prevY: 0, vx: 0, vy: 0, onGround: false, coyote: 0, jumpBuf: 0,
     jumped: false, landed: false, face: 1, stun: 0, slip: 0, slipDir: 1, slipSpeed: 8.5,
     flipped: 0, beltVx: 0, speedMul: 1, jumpMul: 1, gravDir: 1, atDoor: false, prevJump: false,
+    _lockedNotified: false,
     hit: { bonkCx: -1, bonkCy: -1, wallCx: -1, wallCy: -1 },
   };
 }
@@ -28,7 +29,8 @@ export function createGame(levels, levelIndex = 0, opts = {}) {
   const players = coop ? [createPlayerState(), createPlayerState()] : [createPlayerState()];
   const g = {
     coop, levels, levelIndex, deaths: 0, levelDeaths: 0, killerTrapIndex: -1, lastTrapIndex: -1, lastTrapTime: -99,
-    finished: false, time: 0, darkTimer: 0,
+    finished: false, time: 0, darkTimer: 0, keysTotal: 0, keysLeft: 0, channelA: false, channelB: false,
+    hasPlateA: false, hasPlateB: false,
     dead: false, deadTimer: 0, deathCause: null, deathVictim: -1, prevJump: false,
     events: [], hit: players[0].hit,
     players,
@@ -63,20 +65,35 @@ function resetLevel(g) {
   g.traps = L.trapDefs.map((d) => ({
     ...d, state: 'idle', timer: 0, offsetY: 0, vx: 0, vy: 0, x: d.cx + 0.5, y: d.cy, prevX: d.cx + 0.5, prevY: d.cy,
     ext: 0, hit: false, hitMask: 0, insideMask: 0, shy: false, onGround: false, face: -1,
-    revealed: false, active: false, armed: false, triggered: false, cooldown: 0, stopIndex: 0,
+    revealed: false, active: false, armed: false, triggered: false, collected: false, pressed: false, open: false,
+    defuse: 0, defused: false, defusing: false, cooldown: 0, stopIndex: 0,
   }));
+  g.keysTotal = 0;
+  g.hasPlateA = false;
+  g.hasPlateB = false;
   for (const t of g.traps) {
     if (t.kind === 'fallingFloor' || t.kind === 'launchFloor' || t.kind === 'antiJump' ||
         t.kind === 'invisibleBlock' || t.kind === 'conveyor' || t.kind === 'slowFloor') {
       g.solid[t.cell] = 1;
     }
+    if (t.kind === 'keyItem') g.keysTotal++;
+    if (t.kind === 'plateA') g.hasPlateA = true;
+    if (t.kind === 'plateB') g.hasPlateB = true;
+    if (t.kind === 'gateA' || t.kind === 'gateB') {
+      let cy = t.cy + 1;
+      while (cy < L.H && L.tiles[cy * L.W + t.cx] !== TILE.SOLID) cy++;
+      t.topY = cy < L.H ? cy : L.H + 3;
+    }
   }
+  g.keysLeft = g.keysTotal;
+  g.channelA = false;
+  g.channelB = false;
   for (const p of g.players) {
     Object.assign(p, {
       x: L.start.x, y: L.start.y, prevX: L.start.x, prevY: L.start.y, vx: 0, vy: 0,
       onGround: false, coyote: 0, jumpBuf: 0, jumped: false, landed: false, face: 1,
       stun: 0, slip: 0, slipDir: 1, slipSpeed: 8.5, flipped: 0, beltVx: 0, speedMul: 1, jumpMul: 1,
-      gravDir: 1, atDoor: false, prevJump: false,
+      gravDir: 1, atDoor: false, prevJump: false, _lockedNotified: false,
     });
     p.hit.bonkCx = -1; p.hit.bonkCy = -1; p.hit.wallCx = -1; p.hit.wallCy = -1;
   }
@@ -158,10 +175,12 @@ export function step(g, inputOrInputs, dt) {
     const slipping = p.slip > 0;
     p.slip = Math.max(0, p.slip - dt);
     p.flipped = Math.max(0, p.flipped - dt);
-    const rawWant = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
+    const rawWant = Number.isFinite(inp.moveX)
+      ? Math.max(-1, Math.min(1, inp.moveX))
+      : ((inp.right ? 1 : 0) - (inp.left ? 1 : 0));
     const want = p.flipped > 0 ? -rawWant : rawWant;
     g._wants[pi] = want;
-    if (want && !stunned && !slipping) p.face = want;
+    if (Math.abs(want) > 0.05 && !stunned && !slipping) p.face = want > 0 ? 1 : -1;
     const dir = stunned ? p.vx / PHYS.move : (slipping ? p.slipDir * (p.slipSpeed / PHYS.move) : want);
     if (stunned) { p.speedMul = 1; p.beltVx = 0; }
     movePlayer(p, dir, jumpPressed && !stunned && !slipping, dt, g.isSolid, p.hit);
@@ -176,10 +195,18 @@ export function step(g, inputOrInputs, dt) {
   checkHazards(g);
 
   if (!g.dead && g.door && !hasPendingDoorRun(g)) {
+    const locked = g.keysLeft > 0 || hasUndefusedBomb(g);
     for (let pi = 0; pi < g.players.length; pi++) {
       const p = g.players[pi];
       if (p.atDoor) continue;
       if (overlaps(p, g.door.x - 0.35, g.door.y, g.door.x + 0.35, g.door.y + 1.2)) {
+        if (locked) {
+          if (!p._lockedNotified) {
+            p._lockedNotified = true;
+            emit(g, 'doorLocked', { playerIndex: pi, keysLeft: g.keysLeft });
+          }
+          continue;
+        }
         if (!g.coop) {
           win(g);
           break;
@@ -188,11 +215,21 @@ export function step(g, inputOrInputs, dt) {
         p.vx = 0;
         p.vy = 0;
         emit(g, 'doorWait', { playerIndex: pi, x: g.door.x, y: g.door.y });
+      } else {
+        p._lockedNotified = false;
       }
     }
-    if (g.coop && g.players.every((p) => p.atDoor)) win(g);
+    if (!locked && g.coop && g.players.every((p) => p.atDoor)) win(g);
   }
   return g.events;
+}
+
+function hasUndefusedBomb(g) {
+  for (let i = 0; i < g.traps.length; i++) {
+    const t = g.traps[i];
+    if (t.kind === 'bomb' && !t.defused) return true;
+  }
+  return false;
 }
 
 function hasPendingDoorRun(g) {
@@ -218,6 +255,30 @@ function updateTraps(g, dt) {
     players[pi].speedMul = 1;
     players[pi].jumpMul = 1;
   }
+
+  const prevA = g.channelA;
+  const prevB = g.channelB;
+  g.channelA = false;
+  g.channelB = false;
+  for (let i = 0; i < g.traps.length; i++) {
+    const t = g.traps[i];
+    if (t.kind !== 'plateA' && t.kind !== 'plateB') continue;
+    let on = false;
+    for (let pi = 0; pi < players.length; pi++) {
+      const p = players[pi];
+      if (!p.atDoor && p.onGround && p.x + PHYS.halfW > t.cx + 0.08 && p.x - PHYS.halfW < t.cx + 0.92 && Math.abs(p.y - t.cy) < 0.45) {
+        on = true;
+        break;
+      }
+    }
+    t.pressed = on;
+    if (on) {
+      if (t.kind === 'plateA') g.channelA = true;
+      else g.channelB = true;
+    }
+  }
+  if (g.channelA && !prevA) emit(g, 'gateOpen', { channel: 'A' });
+  if (g.channelB && !prevB) emit(g, 'gateOpen', { channel: 'B' });
 
   for (let i = 0; i < g.traps.length; i++) {
     const t = g.traps[i];
@@ -711,6 +772,72 @@ function updateTraps(g, dt) {
           }
         }
         break;
+      case 'keyItem':
+        if (!t.collected) {
+          for (let pi = 0; pi < players.length; pi++) {
+            const p = players[pi];
+            if (!p.atDoor && overlaps(p, t.cx + 0.1, t.cy, t.cx + 0.9, t.cy + 0.95)) {
+              t.collected = true;
+              g.keysLeft = Math.max(0, g.keysLeft - 1);
+              emit(g, 'key', { x: t.cx + 0.5, y: t.cy + 0.5, left: g.keysLeft, playerIndex: pi });
+              break;
+            }
+          }
+        }
+        break;
+      case 'gateA':
+        t.open = g.channelA;
+        break;
+      case 'gateB':
+        t.open = g.channelB;
+        break;
+      case 'bomb': {
+        if (t.defused) { t.state = 'defused'; t.defusing = false; break; }
+        if (t.state === 'idle') {
+          for (let pi = 0; pi < players.length; pi++) {
+            const p = players[pi];
+            if (!p.atDoor && Math.abs(p.x - (t.cx + 0.5)) < t.triggerDist && Math.abs(p.y - t.cy) < 4) {
+              t.state = 'ticking';
+              t.timer = t.fuse;
+              emit(g, 'trap', { kind: 'bomb', x: t.cx + 0.5, y: t.cy + 0.5 });
+              break;
+            }
+          }
+        } else if (t.state === 'ticking') {
+          t.timer -= dt;
+          if (t.timer <= 0) {
+            t.timer = 0;
+            t.state = 'exploded';
+            t.defusing = false;
+            emit(g, 'boom', { x: t.cx + 0.5, y: t.cy + 0.5 });
+            die(g, 'bomb', i, 0);
+            break;
+          }
+          let defuserNear = false;
+          for (let pi = 0; pi < players.length; pi++) {
+            const p = players[pi];
+            if (!p.atDoor && Math.abs(p.x - (t.cx + 0.5)) < 1.35 && Math.abs(p.y - t.cy) < 1.35) {
+              defuserNear = true;
+              break;
+            }
+          }
+          const supported = !g.hasPlateA || !g.coop || g.channelA;
+          if (defuserNear && supported) {
+            t.defusing = true;
+            t.defuse = Math.min(1, t.defuse + dt / t.defuseTime);
+            if (t.defuse >= 1) {
+              t.defused = true;
+              t.defusing = false;
+              t.state = 'defused';
+              emit(g, 'defused', { x: t.cx + 0.5, y: t.cy + 0.5 });
+            }
+          } else {
+            t.defusing = false;
+            t.defuse = Math.max(0, t.defuse - dt * 0.25);
+          }
+        }
+        break;
+      }
       default: break;
     }
   }
@@ -743,13 +870,18 @@ function checkHazards(g) {
         die(g, 'spikes', i, pi);
         return;
       }
+      if ((t.kind === 'gateA' || t.kind === 'gateB') && !t.open && overlaps(p, t.cx + 0.18, t.cy, t.cx + 0.82, t.topY ?? (t.cy + 0.95))) {
+        die(g, 'gate', i, pi);
+        return;
+      }
     }
   }
 }
 
 function win(g) {
   emit(g, 'win', { level: g.levelIndex, deaths: g.levelDeaths });
-  if (g.levelIndex + 1 < g.levels.length) loadLevel(g, g.levelIndex + 1);
+  const next = g.levels[g.levelIndex + 1];
+  if (next && (!next.coopOnly || g.coop)) loadLevel(g, g.levelIndex + 1);
   else g.finished = true;
 }
 
@@ -759,6 +891,9 @@ export function exportCoopSnapshot(g) {
     levelIndex: g.levelIndex,
     time: g.time,
     darkTimer: g.darkTimer,
+    keysLeft: g.keysLeft,
+    channelA: g.channelA,
+    channelB: g.channelB,
     dead: g.dead,
     deadTimer: g.deadTimer,
     deathCause: g.deathCause,
@@ -775,17 +910,26 @@ export function exportCoopSnapshot(g) {
     traps: g.traps.map((t) => ({
       state: t.state, offsetY: t.offsetY, x: t.x, y: t.y, ext: t.ext, vx: t.vx,
       face: t.face, shy: t.shy, onGround: t.onGround, revealed: t.revealed,
-      active: t.active, triggered: t.triggered, timer: t.timer, stopIndex: t.stopIndex,
+      active: t.active, triggered: t.triggered, collected: t.collected, pressed: t.pressed,
+      open: t.open, defuse: t.defuse, defused: t.defused, defusing: t.defusing,
+      timer: t.timer, stopIndex: t.stopIndex,
     })),
   };
 }
 
-/** Applies a Host snapshot onto the Guest simulation state without discarding interpolation anchors. */
+/** Applies a Host snapshot onto the Guest simulation state without discarding smooth interpolation anchors. */
 export function applyCoopSnapshot(g, snap) {
-  if (!snap) return;
-  if (snap.levelIndex !== g.levelIndex) loadLevel(g, snap.levelIndex);
+  if (!snap) return { levelChanged: false, respawned: false };
+  const levelChanged = snap.levelIndex !== g.levelIndex;
+  const wasDead = g.dead;
+  const prevTime = g.time;
+  if (levelChanged) loadLevel(g, snap.levelIndex);
+  const respawned = levelChanged || (wasDead && !snap.dead) || (snap.time < 0.25 && prevTime > 0.35);
   g.time = snap.time;
   g.darkTimer = snap.darkTimer;
+  if (snap.keysLeft !== undefined) g.keysLeft = snap.keysLeft;
+  if (snap.channelA !== undefined) g.channelA = snap.channelA;
+  if (snap.channelB !== undefined) g.channelB = snap.channelB;
   g.dead = snap.dead;
   g.deadTimer = snap.deadTimer;
   g.deathCause = snap.deathCause;
@@ -798,20 +942,26 @@ export function applyCoopSnapshot(g, snap) {
     for (let i = 0; i < Math.min(g.players.length, snap.players.length); i++) {
       const dst = g.players[i];
       const src = snap.players[i];
-      dst.prevX = dst.x;
-      dst.prevY = dst.y;
+      const teleported = respawned || Math.hypot(src.x - dst.x, src.y - dst.y) > 2.5;
+      const anchorX = teleported ? src.x : dst.x;
+      const anchorY = teleported ? src.y : dst.y;
+      Object.assign(dst, src);
+      dst.prevX = anchorX;
+      dst.prevY = anchorY;
       dst.jumped = false;
       dst.landed = false;
-      Object.assign(dst, src);
     }
   }
   if (Array.isArray(snap.traps)) {
     for (let i = 0; i < Math.min(g.traps.length, snap.traps.length); i++) {
       const dst = g.traps[i];
       const src = snap.traps[i];
-      dst.prevX = dst.x;
-      dst.prevY = dst.y;
+      const teleported = respawned || (src.x !== undefined && Math.hypot(src.x - dst.x, (src.y ?? dst.y) - dst.y) > 2.5);
+      const anchorX = teleported ? (src.x ?? dst.x) : dst.x;
+      const anchorY = teleported ? (src.y ?? dst.y) : dst.y;
       Object.assign(dst, src);
+      dst.prevX = anchorX;
+      dst.prevY = anchorY;
       if ((dst.kind === 'fallingFloor' && dst.state === 'falling') ||
           (dst.kind === 'launchFloor' && dst.state === 'launching')) {
         g.solid[dst.cell] = 0;
@@ -820,4 +970,5 @@ export function applyCoopSnapshot(g, snap) {
       }
     }
   }
+  return { levelChanged, respawned };
 }

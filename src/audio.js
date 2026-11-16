@@ -12,6 +12,7 @@ const MELODIES = {
   2: [440, 523, 659, 523, 587, 494, 440, 392], // Toy Factory (playful clockwork)
   3: [392, 466, 587, 523, 466, 440, 392, 349], // Haunted Bakery (quirky minor)
   4: [494, 587, 740, 659, 587, 554, 494, 440], // Mind Games (mischievous twilight arpeggio)
+  5: [587, 740, 880, 987, 880, 740, 659, 587], // Couple Co-op (warm bright duet motif)
 };
 
 export function initAudio() {
@@ -114,6 +115,11 @@ export const sfx = {
   launch: () => { tone('sawtooth', 160, 880, 0.16, 0.13); noiseBurst(0.1, 0.07); },
   antiJump: () => { tone('square', 720, 260, 0.09, 0.12); tone('sawtooth', 320, 120, 0.12, 0.08, 0.03); },
   gift: () => { tone('triangle', 520, 1180, 0.12, 0.12); [784, 622, 466].forEach((f, i) => tone('square', f, f * 0.9, 0.08, 0.06, 0.08 + i * 0.06)); },
+  key: () => [784, 988, 1319].forEach((f, i) => tone('triangle', f, f * 1.04, 0.11, 0.1, i * 0.055)),
+  gateOpen: () => tone('sine', 330, 880, 0.14, 0.09),
+  defused: () => [523, 659, 784, 1046, 1319].forEach((f, i) => tone('triangle', f, f, 0.1, 0.08, i * 0.05)),
+  boom: () => { tone('sawtooth', 160, 32, 0.45, 0.18); noiseBurst(0.35, 0.18); },
+  locked: () => { tone('square', 220, 180, 0.08, 0.08); tone('square', 170, 140, 0.1, 0.08, 0.09); },
   win: () => [523, 659, 784, 1046].forEach((f, i) => tone('square', f, f, 0.12, 0.07, i * 0.09)),
   babble: () => { for (let i = 0; i < 6; i++) { const f = 500 + Math.random() * 500; tone('square', f, f * 0.9, 0.05, 0.035, i * 0.06); } },
 };

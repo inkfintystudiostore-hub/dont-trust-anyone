@@ -40,34 +40,31 @@
 - Brand tokens nikaale: cream `#fffbf7`, ink `#1f1916`, crimson `#8b0d1a`, fonts Outfit / Plus Jakarta Sans / JetBrains Mono, 8px button radius, ease `cubic-bezier(.22,.61,.36,1)`.
 - Game Room mein Chibi 3D Ludo mila: Three.js + Cloudflare Worker + WebSocket rooms (`/rooms/reserve`, `/ws/room/{code}`), aur iframe embed (`?embed=1&parentUrl=`). Hamara game bhi isi pattern pe banega.
 
-### 1.3 3D assets (13 models)
-- **Pipeline:** Gemini (Nano Banana) mein bina chehre ki reference image → `tools/meshy-image-to-3d.mjs` (Meshy 7.1, textured, remesh) → viewer mein check → gltf-transform compress.
-- **Models:** Momo, Mimi, Darwaza Ji, Gappu sign, Kabootar, Lollipop tree, Cotton cloud, Banana peel, Boxing glove, Rubber chicken, Candy boulder, Checkpoint flag, Co-op switch.
-- **Kharcha:** 420 Meshy credits (980 bache). Gemini free.
-- **Size:** raw 25 MB → web 1.3 MB (har model 56–133 KB, meshopt + WebP 1024px).
-- **Mimi:** Meshy ne 2 baar chehra bana diya, isliye Mimi = Momo ka mesh, peach + mint rang mein (`tools/recolor-glb.mjs`).
+### 1.3 3D assets (18 models)
+- **Pipeline:** Gemini (Nano Banana) + Meshy v2 Text-to-3D (`tools/meshy-image-to-3d.mjs`, `tools/meshy-text-to-3d.mjs`) → `gltf-transform optimize` (meshopt + WebP 1024px).
+- **Models:** Momo, Mimi, Darwaza Ji, Gappu sign, Kabootar, Lollipop tree, Cotton cloud, Banana peel, Boxing glove, Rubber chicken, Candy boulder, Checkpoint flag, Co-op switch, Mystery gift box (`gift_box`), Mirror robot (`toy_robot`), Peek-a-boo ghost (`cute_ghost`), Golden key (`golden_key`), Ticking bomb (`ticking_bomb`).
+- **Mimi:** Momo ka mesh recolor (`tools/recolor-glb.mjs`), peach body + mint sprout.
 
-### 1.4 Khelne layak game (M1 + M3/M4 Polish + Worlds 1–3) ✅
+### 1.4 Khelne layak game (Worlds 1–5 + Online Couples Co-op) ✅
 | Hissa | File(s) | Kya karta hai |
 |---|---|---|
-| Physics | `src/core/physics.js` | Tile-based platformer: run, jump, coyote time, jump buffer, wall/ceiling hits, conveyor/slow modifiers, inverted gravity (`gravDir = -1`) |
-| Game rules | `src/core/game.js` | Traps, death, respawn, win, next level, `killerTrapIndex` hint, `prevX/prevY` snapshots. Fixed 60 Hz step, rendering se alag |
-| Level format | `src/core/level.js` | ASCII map (`22` tile/trap types + multi-stop markers) → level |
-| Levels | `src/levels.js` | Worlds 1–3 ke saare **30 levels** (Candy Meadow, Toy Factory, Haunted Bakery) |
+| Physics | `src/core/physics.js` | Tile-based platformer: run, proportional analog `moveX`, jump, coyote time, jump buffer, wall/ceiling hits, conveyor/slow/launch modifiers, inverted gravity (`gravDir = -1`) |
+| Game rules | `src/core/game.js` | Traps, shared-fate co-op death/respawn, win (`coopOnly` guard), keys (`*`), hold plates (`H`/`h`), full-height laser gates (`=`/`-`), bomb defusal (`@`), `prevX/prevY` snapshots. Fixed 60 Hz step, rendering se alag |
+| Level format | `src/core/level.js` | ASCII map (`29` tile/trap types + markers + `coopOnly`) → level |
+| Levels | `src/levels.js` | **42 levels** across Worlds 1–5: Worlds 1–4 Solo (`L1–L35`) + World 5 Couples Co-op (`L36–L42`) |
 | Save | `src/save.js` | `localStorage` persistence (`unlocked`, `bestDeaths`, `totalDeaths`, `muted`, `assist`) |
-| Text | `src/i18n.js` | Saara player-facing text ek table mein (Hinglish). Nayi bhasha = nayi table |
-| 3D duniya | `src/render/world.js` | World themes + fog, instanced tiles, 17 trap visuals, Darwaza Ji ki aankhein, killer-trap/assist crimson outline |
-| Diorama map | `src/render/diorama.js` | Tabletop 3D diorama (30 level nodes, 3 world islands, uddta kabootar) |
-| Momo | `src/render/momo.js` | Render interpolation, `dt`-independent squash/stretch, eye lag, idle sit/sleep gags, gravity flip, crusher pancake & pit stretch |
-| FX | `src/render/fx.js` | Death confetti (90 tukde) + fixed 16-particle dust pool |
-| HUD/menu | `index.html`, `src/style.css`, `src/ui/hud.js` | Inkfinity UI, iris wipe, crack banner, milestone shake, Bharosa assist, map/restart/mute buttons, portrait hint |
-| Input | `src/input.js` | Keyboard, touch buttons (mobile + restart), gamepad |
-| Sound | `src/audio.js` | Web Audio SFX (15+ cues) + per-world bouncy procedural music loop with 0.5s death ducking (0 KB) |
+| Text | `src/i18n.js` | Saara player-facing text ek table mein (Hinglish). |
+| 3D duniya | `src/render/world.js` | World 1–5 themes + fog, instanced tiles, zero red trap hints, tall laser barriers, Darwaza padlock, bomb fuse/defuse bars, spinning golden key |
+| Diorama map | `src/render/diorama.js` | Tabletop 3D diorama (`42` level nodes across `5` world islands, uddta kabootar) |
+| Momo & Mimi | `src/render/momo.js` | Render interpolation, `dt`-independent squash/stretch, eye lag, idle sit/sleep gags, gravity flip, crusher pancake & pit stretch |
+| FX | `src/render/fx.js` | Death confetti (90 tukde) + fixed 16-particle dust pool + ambient motes |
+| HUD/menu & Fullscreen | `index.html`, `src/style.css`, `src/ui/hud.js`, `src/utils/fullscreen.js` | Inkfinity UI (`100dvh`), Iris wipe, crack banner, auto-fullscreen + `#btn-fullscreen` toggle, Leave Co-op button, 5-World Map |
+| Input | `src/input.js` | Keyboard, smooth **Virtual Analog Joystick** (`moveX` + pull-down fast-fall), gamepad |
+| Sound | `src/audio.js` | Web Audio SFX (20+ cues incl. key, gate, defuse, boom, locked door) + per-world procedural loop (`Worlds 1–5`) with 0.5s death ducking (0 KB) |
 
 ### 1.5 Quality
-- **129 automated tests** (`npm test`): `save.test.js`, `levels.test.js`, `game.test.js`, aur `solutions.test.js` — har 30 levels (`L1–L30`) par naive-player trap death + 0-death solution + `>= 0.12s` precision-window sweeps.
-- Bot tests ne L2 invisible block (`STUN`), L15 conveyor-momentum falling bridge, L18/L28 sneeze-cloud reaction window, aur L30 ceiling-jump alignments pakde aur fix kiye.
-- Production build (`npm run build`) 100% clean, zero asset download bloat (`0 KB` audio files).
+- **192 automated tests** (`npm test`): `save.test.js`, `levels.test.js`, `game.test.js`, `solutions.test.js` (`L1–L35` + precision sweeps), `coop.test.js`, `coopSolutions.test.js` (`L36–L42` coordination + gate bypass prevention), `roomCode.test.js`, `worker/roomLogic.test.js`.
+- Production build (`npm run build`) 100% clean, deployed live on Cloudflare Workers & `inkfinitystudio.store/game-room`.
 
 ### 1.6 Chalana
 ```bash
@@ -123,10 +120,10 @@ Har naya trap ya level in niyamon pe check karna:
 ### 4.1 Controls
 | Action | Keyboard | Gamepad | Mobile |
 |---|---|---|---|
-| Chalna | ← → / A D | D-pad / left stick | ◀ ▶ buttons |
+| Chalna | ← → / A D | D-pad / left stick (`moveX`) | Smooth **Virtual Analog Joystick** (proportional speed) ✅ |
+| Fast-fall | ↓ / S | D-pad / stick down | Joystick neeche pull (`ny > 0.68`) ✅ |
 | Koodna | Space / ↑ / W | A (button 0) | ⤒ (crimson) |
-| Restart level | R | Start | ↺ button ✅ |
-| Online: dhakka | 🔜 E | 🔜 X | 🔜 |
+| Restart / Fullscreen | R | Start | ↺ / ⛶ buttons ✅ |
 
 ### 4.2 Momo ki physics (code ke asli numbers)
 | Cheez | Value | Matlab |
@@ -272,15 +269,14 @@ Trap tuning: `traps: [{ at: 'D', runTo: 'T', radius: 2.2 }, { at: 'S', delay: 0.
 | **Mirror Momo** | Doosra Momo (glass) | Zone | Ulta chalta hai | Dimaag lagao | 🔜 |
 | **Nakli Death Counter** | HUD | Random | 💀 counter achanak +5 | Sirf irritation | 🔜 |
 
-### 5.8 Co-op traps 🔜 (online, 2 players)
-| Trap | Kya hota hai |
-|---|---|
-| **Do-switch darwaza** | Ek player switch daba ke rakhe, doosra aage jaaye. Switch kabhi kabhi jhooth bolta hai |
-| **Swap** | Dono players ki jagah achanak badal jaati hai |
-| **Ek ka jump, dono ka jump** | Zone mein ek koode to dono koodte hain |
-| **Bharosa pul** | Pul tabhi tikta hai jab dono ek saath chalein. Ek ruka, dono gire |
-| **Dost ka floor** | Floor sirf ek player ke liye solid (rang se pata, Momo cream / Mimi peach) |
-| **Dhakka (bump)** | Dost ko halka dhakka: help ya betrayal. "Betrayals" counter end screen pe |
+### 5.8 Co-op coordination puzzles & traps ✅ (`World 5`, L36–L42)
+| Mechanic | Char | Kya hota hai |
+|---|---|---|
+| **Golden Key** ✅ | `*` | Collect all keys (`keysLeft === 0`) to unlock the golden padlock on Darwaza Ji (`golden_key.glb`) |
+| **Hold Plate A / B** ✅ | `H` / `h` | Crimson (`H`) ya Mint (`h`) arcade button (`coop_switch.glb`): tab tak dabaa jab tak ek partner upar khada rahe |
+| **Hazard Laser Gate A / B** ✅ | `=` / `-` | Full-height vertical laser wall floor se chhat tak — sirf jab partner `H`/`h` dabayega tab khulti hai (upar se kood nahi sakte) |
+| **Paired Ticking Bomb** ✅ | `@` | Proximity fuse countdown (`ticking_bomb.glb`); ek partner bomb defuse karta hai jab doosra partner `H` button daba ke support de — time 0 pe kaboom! Shared-fate death! |
+| **Peek-a-Boo Watchtower** ✅ | `Q` + `H` | Ek partner plate par khada hoke Ghost ki taraf dekhe (freeze) tab doosra partner cross kare |
 
 ### 5.9 Trap combos (jo sabse zyada gussa dilaate hain)
 1. **Sign + Nakli floor:** "Safe ➜" seedha nakli pul ki taraf (L3 ✅).
@@ -339,14 +335,18 @@ Trap tuning: `traps: [{ at: 'D', runTo: 'T', radius: 2.2 }, { at: 'S', delay: 0.
 | 9 | Jashn Mubarak | nakli LEVEL COMPLETE | jashn mein floor gayab | ✅ |
 | 10 | Darwaza Pakdo (mini-boss) | darwaza bhaagta rehta hai | 4 baar bhaagta hai, har baar naye trap pe | ✅ |
 
-### 6.5 World 2 (Toy Factory, L11–L20) & World 3 (Haunted Bakery, L21–L30) ✅
+### 6.5 World 2 (`L11–L20`), World 3 (`L21–L30`), World 4 (`L31–L35`), & World 5 Couple Co-op (`L36–L42`) ✅
 - **World 2 (`L11–L20` ✅):**
   - L11 *Factory Gate* (`>`/`<` conveyors), L12 *Chhat Se Dhadaam* (`M` crushers), L13 *Punch Line* (`V` boxing glove), L14 *Bhaago Patthar!* (`O` boulder + `S`), L15 *Tea Break* (breather + `K` + `FFF.`), L16 *Ulta Pulta* (`U` controls flip), L17 *Assembly Line* (`>`/`<` + `M` + `V`), L18 *Aaa-Chhoo!* (`W` sneeze clouds), L19 *Nakli Save* (`K` + `X` + `O`), L20 *Toy Master* (4-stop mini-boss).
 - **World 3 (`L21–L30` ✅):**
   - L21 *Ulta Chhat* (`Y` gravity flip + ceiling spikes), L22 *Chipchipa Caramel* (`Z` slow floor + `M`), L23 *Bhootiya Pul* (`G` bridge + high road), L24 *Batti Gul* (`N` dark candle memory), L25 *Meethi Neend* (breather + `Y` + `GGG`), L26 *Double Flip* (`Y` + `U`), L27 *Ghost Cake* (`G` + `C` + `I`), L28 *Haunted Storm* (`N` + `W` + `R`), L29 *Bakery Ka Dhoka* (`K` + `Y` + `X`), L30 *Master Chef Darwaza* (5-stop final boss).
+- **World 4 Mind Games (`L31–L35` ✅):**
+  - L31 *Upar Launch?* (`L` launch floor + `A` anti-jump), L32 *Tohfa Kabool?* (`J` mystery gift box), L33 *Ulta Robot* (`E` mirror toy robot), L34 *Sharmila Bhoot* (`Q` peek-a-boo ghost), L35 *Dimaag Ki Dahi* (Worlds 1–4 finale).
+- **World 5 Couple Co-op (`L36–L42`, `coopOnly: true` ✅):**
+  - L36 *Pehle Chabi, Phir Pyaar* (`H`/`=` & `h`/`-` airlock key handoff), L37 *Bomb Squad!* (`@` defusal + `H` + `S`), L38 *Chhat Sambhalna* (upper switch shielding triple laser), L39 *Ulta Pulta Squad* (`A` + `@` + `E` pit bait), L40 *Bhoot Aur Chabi* (watchtower `Q` freeze + `*`), L41 *Twin Keys Dhoka* (`**` + `L` under ceiling spikes), L42 *Do Jism Ek Jaan* (Couples Grand Finale).
 
 ### 6.6 Level map ✅
-Resin-miniature jaisa 3D tabletop diorama (`src/render/diorama.js`) + `src/save.js` (`localStorage` progress & `bestDeaths` per level). 3 world islands, 30 level nodes, aur selected node pe uddta kabootar.
+Resin-miniature jaisa 3D tabletop diorama (`src/render/diorama.js`) + `src/save.js` (`localStorage` progress & `bestDeaths` per level). 5 world islands (`42` level nodes), aur selected node pe uddta kabootar.
 
 ✍️ Tumhara note:
 
@@ -460,9 +460,9 @@ Resin-miniature jaisa 3D tabletop diorama (`src/render/diorama.js`) + `src/save.
 ---
 
 ## 10. UI, accessibility, mobile
-- **HUD:** level naam, `🗺️` Map, `↺` Restart, `🔊` Mute, `🔄 Ulta!` flip badge, `🛡️ Bharosa` assist (10 deaths pe), `💀` counter (10/25/50 milestone shake) ✅
+- **HUD:** level naam, `🗺️` Map, `↺` Restart, `🔊` Mute, `⛶` Fullscreen, `🚪` Leave Co-op, `🔄 Ulta!` flip badge, `1/2 Door` wait badge, `💀` counter ✅
 - **Motion & Transitions:** Circular Iris Wipe between levels, intro slide-in, crack-drop fake banner, `prefers-reduced-motion` sab band rakhta hai ✅
-- **Input & Mobile:** keyboard + gamepad + touch (`◀ ▶ ↺ ⤒`), portrait phone-rotate hint ✅
+- **Input & Mobile:** keyboard + gamepad + smooth **Virtual Analog Joystick** (`moveX` + pull-down fast-fall) + always fullscreen (`100dvh`), portrait phone-rotate hint ✅
 
 ---
 
@@ -554,7 +554,8 @@ Resin-miniature jaisa 3D tabletop diorama (`src/render/diorama.js`) + `src/save.
 4. Mimi ke sir pe mint sprout (recolor GLB, M2 Co-op mein use hogi) ✅
 5. World 1–3 (`L1–L30`) + World 4 Mind Games (`L31–L35`): poore 35 levels complete + bot-tested ✅
 6. Naye unexpected Mind Games traps (`L` Launch Floor, `A` Anti-Jump, `J` Mystery Gift Box `gift_box.glb`, `E` Mirror Toy Robot `toy_robot.glb`, `Q` Peek-a-Boo Ghost `cute_ghost.glb`) + SVG HUD/map UI polish + fast-fall (`↓`/`S`) + contact drop-shadow + parallax sky shader ✅
-7. Online 2-Player Co-op (`Momo` + `Mimi`) via Cloudflare Worker + Durable Object (`https://dont-trust-anyone.inkfintystudio-store.workers.dev`): shared-fate death restarts BOTH players, BOTH must reach door to clear level, 9-digit room codes + `?room=` invite links ✅
+7. Online 2-Player Co-op (`Momo` + `Mimi`) via Cloudflare Worker + Durable Object (`https://dont-trust-anyone.inkfintystudio-store.workers.dev`): shared-fate death restarts BOTH players, BOTH must reach door to clear level, 9-digit room codes + `?room=` invite links, mid-match reconnect support, zero jump-latch drops ✅
+8. World 5 Couple Co-op (`L36–L42`, `coopOnly: true`): Golden Key (`golden_key.glb`), Hold Plates (`H`/`h`, `coop_switch.glb`), Full-height Laser Gates (`=`/`-`), Ticking Bomb Defusal (`ticking_bomb.glb`), always-fullscreen UX + smooth Virtual Analog Joystick + Inkfinity Store Game Room Fullscreen wrapper ✅
 
 ✍️ Tumhare notes / naye ideas:
 

@@ -43,39 +43,49 @@ describe('worker 2-player co-op room state machine', () => {
     expect(rGuestStart.record.started).toBe(false);
     expect(rGuestStart.reply?.type).toBe('error');
 
-    // Host picks L33 (index 32) and starts -> broadcasts start + snapshots
-    const rLevel = handleRoomAction(room, 'p1', { type: 'set_level', levelIndex: 32 }, 1200);
-    expect(rLevel.record.levelIndex).toBe(32);
-    const rStart = handleRoomAction(rLevel.record, 'p1', { type: 'start', levelIndex: 32 }, 1250);
+    // Host picks World 5 L42 (index 41) and starts -> preserves index 41 (not clamped at 34) + broadcasts snapshots
+    const rLevel = handleRoomAction(room, 'p1', { type: 'set_level', levelIndex: 41 }, 1200);
+    expect(rLevel.record.levelIndex).toBe(41);
+    const rStart = handleRoomAction(rLevel.record, 'p1', { type: 'start', levelIndex: 41 }, 1250);
     expect(rStart.record.started).toBe(true);
     expect(rStart.broadcastSnapshots).toBe(true);
     expect(snapshotForPlayer(rStart.record, 'p1').yourSeat).toBe(0);
     expect(snapshotForPlayer(rStart.record, 'p2').yourSeat).toBe(1);
   });
 
-  it('enforces relay authority: only guest relays input, only host relays state and events', () => {
-    let room = createRoomRecord('482910375', 0, 1000);
+  it('enforces relay authority: only guest relays input (including analog moveX), only host relays state and events', () => {
+    let room = createRoomRecord('482910375', 35, 1000);
+    expect(room.levelIndex).toBe(35);
     room = joinRoom(room, 'p1', 'P1', 1000, 'dev-1');
     room = joinRoom(room, 'p2', 'P2', 1100, 'dev-2');
-    room = handleRoomAction(room, 'p1', { type: 'start', levelIndex: 0 }, 1200).record;
+    room = handleRoomAction(room, 'p1', { type: 'start', levelIndex: 35 }, 1200).record;
 
     // Guest spoofing state -> dropped cleanly
     const spoof = handleRoomAction(room, 'p2', { type: 'state', state: { dead: false } }, 1300);
     expect(spoof.relayToOthers).toHaveLength(0);
 
     // Host sending state -> relayed to Guest
-    const hostState = handleRoomAction(room, 'p1', { type: 'state', state: { levelIndex: 0, dead: true } }, 1350);
+    const hostState = handleRoomAction(room, 'p1', { type: 'state', state: { levelIndex: 35, dead: true } }, 1350);
     expect(hostState.relayToOthers).toHaveLength(1);
     expect(hostState.relayToOthers[0].type).toBe('state');
 
-    // Guest sending input -> relayed to Host
-    const guestIn = handleRoomAction(room, 'p2', { type: 'input', left: false, right: true, down: false, jump: true }, 1400);
+    // Guest sending analog joystick input -> relayed & clamped [-1..1]
+    const guestIn = handleRoomAction(room, 'p2', { type: 'input', left: false, right: true, moveX: 0.65, down: false, jump: true }, 1400);
     expect(guestIn.relayToOthers).toHaveLength(1);
-    expect(guestIn.relayToOthers[0]).toMatchObject({ type: 'input', right: true, jump: true });
+    expect(guestIn.relayToOthers[0]).toMatchObject({ type: 'input', right: true, moveX: 0.65, jump: true });
 
     // Host trying to send guest-input -> ignored
     const hostIn = handleRoomAction(room, 'p1', { type: 'input', right: true }, 1450);
     expect(hostIn.relayToOthers).toHaveLength(0);
+
+    // Fallback moveX when digital left/right sent without moveX
+    const legacyRight = handleRoomAction(room, 'p2', { type: 'input', left: false, right: true, down: false, jump: false }, 1460);
+    expect(legacyRight.relayToOthers[0].moveX).toBe(1);
+
+    // Host leaving clears hostId cleanly so seat 0 can be reclaimed by a fresh host
+    const afterHostLeave = handleRoomAction(room, 'p1', { type: 'leave' }, 1500);
+    expect(afterHostLeave.record.hostId).toBe('');
+    expect(afterHostLeave.record.started).toBe(false);
   });
 
   it('expires idle rooms after ROOM_IDLE_TTL_MS', () => {

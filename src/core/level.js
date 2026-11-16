@@ -7,6 +7,8 @@
  *   O  boulder       U  controls flip       Y  gravity flip    Z  slow caramel
  *   W  sneeze cloud  K  fake checkpoint     N  dark candle     L  launch floor
  *   A  anti-jump     J  mystery gift box    E  mirror robot    Q  peek-a-boo ghost
+ *   *  golden key    H  hold plate A        =  hazard gate A   h  hold plate B
+ *   -  hazard gate B @  co-op bomb
  *   any other letter/digit: marker (e.g. T, 1..9 = door run targets)
  * `traps` tunes trap chars: { at: 'S', delay, radius } or { at: 'D', runTo: 'T' | ['1','2'], radius }.
  *
@@ -41,9 +43,15 @@ const TRAP_BUILDERS = {
   J: (base, cfg) => ({ kind: 'giftTrap', ...base, duration: cfg.duration ?? 3.0 }),
   E: (base, cfg) => ({ kind: 'mimicRobot', ...base, speed: cfg.speed ?? 4.2 }),
   Q: (base, cfg) => ({ kind: 'booGhost', ...base, speed: cfg.speed ?? 3.6 }),
+  '*': (base) => ({ kind: 'keyItem', ...base }),
+  H: (base) => ({ kind: 'plateA', ...base, channel: 'A' }),
+  '=': (base) => ({ kind: 'gateA', ...base, channel: 'A' }),
+  h: (base) => ({ kind: 'plateB', ...base, channel: 'B' }),
+  '-': (base) => ({ kind: 'gateB', ...base, channel: 'B' }),
+  '@': (base, cfg) => ({ kind: 'bomb', ...base, fuse: cfg.fuse ?? 12.0, defuseTime: cfg.defuseTime ?? 1.2, triggerDist: cfg.triggerDist ?? 6.5 }),
 };
 
-export function parseLevel({ name, world = 1, rows, traps = [], signs = [], taunts = [] }) {
+export function parseLevel({ name, world = 1, coopOnly = false, rows, traps = [], signs = [], taunts = [] }) {
   const H = rows.length;
   const W = Math.max(...rows.map((r) => r.length));
   const tiles = new Uint8Array(W * H);
@@ -78,5 +86,5 @@ export function parseLevel({ name, world = 1, rows, traps = [], signs = [], taun
   });
   if (door && stops.length) trapDefs.push({ kind: 'runningDoor', to: stops[0], stops, radius: doorCfg.radius ?? 2 });
 
-  return { name, world, W, H, tiles, start, door, markers, trapDefs, signs, taunts };
+  return { name, world, coopOnly: !!coopOnly, W, H, tiles, start, door, markers, trapDefs, signs, taunts };
 }

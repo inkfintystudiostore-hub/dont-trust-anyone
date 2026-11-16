@@ -3,7 +3,7 @@
  * Manages host (Momo) + guest (Mimi) seats, device reclaim on refresh, level selection, and relay permissions.
  */
 export const ROOM_IDLE_TTL_MS = 6 * 60 * 60 * 1000;
-const MAX_LEVEL_INDEX = 34;
+const MAX_LEVEL_INDEX = 41;
 
 function sanitizeName(raw) {
   if (typeof raw !== 'string') return undefined;
@@ -170,11 +170,14 @@ export function handleRoomAction(record, playerId, msg, now = Date.now()) {
     case 'input': {
       // Only Guest (seat 1) streams remote player input to Host (seat 0).
       if (seatIndex !== 1 || !record.started) return noop;
+      const rawMove = Number(msg.moveX);
+      const fallbackMove = (msg.right ? 1 : 0) - (msg.left ? 1 : 0);
       const payload = {
         type: 'input',
         seq: Number(msg.seq) || 0,
         left: !!msg.left,
         right: !!msg.right,
+        moveX: msg.moveX !== undefined && Number.isFinite(rawMove) ? Math.max(-1, Math.min(1, rawMove)) : fallbackMove,
         down: !!msg.down,
         jump: !!msg.jump,
       };
@@ -233,7 +236,14 @@ export function handleRoomAction(record, playerId, msg, now = Date.now()) {
       ));
       const seatDeviceIds = { ...(record.seatDeviceIds ?? {}) };
       delete seatDeviceIds[seatIndex];
-      const next = { ...record, seats, seatDeviceIds, started: false, lastActiveAt: now };
+      const next = {
+        ...record,
+        hostId: seatIndex === 0 ? '' : record.hostId,
+        seats,
+        seatDeviceIds,
+        started: false,
+        lastActiveAt: now,
+      };
       return {
         record: next,
         persist: true,

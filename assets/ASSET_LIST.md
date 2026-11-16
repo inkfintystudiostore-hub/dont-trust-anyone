@@ -61,6 +61,8 @@ Purani SVG drawings (`assets/concepts/`) ab sirf rough guide hain. Asli referenc
 | 14 | Mystery gift box ✅ **done** | `gift_box.glb` | Mind Games | cute wrapped mystery gift box with coral ribbon and bouncy spring jack-in-the-box vibe, shiny pastel resin toy, no face |
 | 15 | Mirror toy robot ✅ **done** | `toy_robot.glb` | Mind Games | cute retro blocky mint & peach wind-up clockwork toy robot with gold winding key and blank dark visor (eyes in code), chunky resin toy |
 | 16 | Peek-a-boo ghost ✅ **done** | `cute_ghost.glb` | Mind Games | smooth cream-to-lavender marshmallow ghost figurine with tiny scalloped tail and nub arms, no eyes, no mouth, chunky resin toy |
+| 17 | Golden Co-op Key ✅ **done** (86 KB compressed) | `golden_key.glb` | World 5 (Couple Co-op) | cute ornate glossy pastel-gold skeleton key prop, smooth resin toy finish, no face |
+| 18 | Ticking Co-op Bomb ✅ **done** (163 KB compressed) | `ticking_bomb.glb` | World 5 (Couple Co-op) | classic smooth matte charcoal round cartoon bomb with gold brass collar and twisted cream rope fuse, no face |
 
 **M3 wale (9) sabse pehle**, M4 wale (4) baad mein.
 
