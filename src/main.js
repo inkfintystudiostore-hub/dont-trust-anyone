@@ -40,6 +40,18 @@ addEventListener('pointerdown', (e) => {
   if (e.target.closest?.('#btn-fullscreen')) return;
   ensureDefaultFullscreen();
 }, { capture: true, passive: true });
+for (const evName of ['gesturestart', 'gesturechange', 'gestureend']) {
+  addEventListener(evName, (e) => e.preventDefault(), { passive: false });
+}
+addEventListener('touchmove', (e) => {
+  if (e.touches.length > 1) e.preventDefault();
+}, { passive: false });
+let lastTapAt = 0;
+addEventListener('touchend', (e) => {
+  const now = performance.now();
+  if (now - lastTapAt < 300 && !e.target.closest?.('button, a, input')) e.preventDefault();
+  lastTapAt = now;
+}, { passive: false });
 
 const canvas = $('game');
 const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -132,6 +144,9 @@ const camPos = new Vector3(game.player.x, game.player.y + 2, 14);
 const camLook = new Vector3();
 
 const lobby = createCoopLobby(LEVELS, {
+  onSnapshot(snap) {
+    if (playing && coopRole) hud.coopPresence(snap);
+  },
   onMatchStart(levelIndex, snap) {
     coopRole = snap?.isHost ? 'host' : 'guest';
     const startIdx = Number.isFinite(Number(snap?.levelIndex)) ? snap.levelIndex : levelIndex;
@@ -195,7 +210,20 @@ const lobby = createCoopLobby(LEVELS, {
   },
   onPeerLeft() {
     if (!playing) return;
-    hud.toast('Partner left room!', 1800);
+    hud.toast('Partner left — 30s to reconnect!', 2200);
+  },
+  onRoomClosed(_reason, message) {
+    const msg = message || 'Room closed.';
+    if (playing) {
+      setPlaying(false);
+      stopMusic();
+      clearActionTimers();
+      coopRole = null;
+      hud.hide();
+      $('coop').hidden = false;
+      $('coop-status').textContent = msg;
+      hud.toast(msg, 3200);
+    }
   },
   onClosed() {
     $('menu').hidden = false;
@@ -229,7 +257,8 @@ function rebuildWorld() {
   }
   hud.doorWait(false);
   if (playing) startMusic(game.level.world ?? 1);
-  camPos.set(game.player.x, game.player.y + 2, innerWidth < innerHeight ? 20 : 14);
+  const initZ = innerWidth < innerHeight ? Math.max(26, 15 / Math.max(0.45, camera.aspect)) : 14;
+  camPos.set(game.player.x, game.player.y + 1.1, initZ);
 }
 
 function showLevel() {
@@ -795,13 +824,16 @@ function frame(now) {
     sun.intensity += (targetSun - sun.intensity) * k(10);
 
     const L = game.level;
-    const targetZ = (innerWidth < innerHeight ? 20 : 14) + spreadZ;
+    const isPortrait = innerWidth < innerHeight;
+    const baseFov = isPortrait ? 44 : 38;
+    const targetZ = (isPortrait ? Math.max(26, 15 / Math.max(0.45, camera.aspect)) : 14) + spreadZ;
     camPos.z += (targetZ - camPos.z) * k(6);
-    const halfView = Math.tan((38 * Math.PI) / 360) * camPos.z * camera.aspect;
+    const halfView = Math.tan((baseFov * Math.PI) / 360) * camPos.z * camera.aspect;
     const lo = Math.min(halfView - 1, L.W / 2), hi = Math.max(L.W - halfView + 1, L.W / 2);
     const rawTx = Math.max(lo, Math.min(hi, camFocusX));
     const tx = Math.abs(rawTx - camPos.x) > 0.35 ? rawTx : camPos.x;
-    const ty = Math.max(3.2, camFocusY + 1.6);
+    const joyLift = matchMedia('(pointer: coarse)').matches ? -0.95 : -0.35;
+    const ty = Math.max(2.1, camFocusY + 1.4 + joyLift);
     camPos.x += (tx - camPos.x) * k(5.5);
     camPos.y += (ty + 1.4 - camPos.y) * k(4.5);
 
@@ -811,8 +843,8 @@ function frame(now) {
     const sy = shake > 0 ? Math.cos(time * 61) * shake * 0.7 : 0;
 
     fovPunch = Math.max(0, fovPunch - dt * 14);
-    if (Math.abs(camera.fov - (38 - fovPunch)) > 0.05) {
-      camera.fov = 38 - fovPunch;
+    if (Math.abs(camera.fov - (baseFov - fovPunch)) > 0.05) {
+      camera.fov = baseFov - fovPunch;
       camera.updateProjectionMatrix();
     }
 

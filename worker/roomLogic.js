@@ -2,7 +2,8 @@
  * Authoritative 2-player Co-op room state machine shared between DontTrustRoomDO and Vitest.
  * Manages host (Momo) + guest (Mimi) seats, device reclaim on refresh, level selection, and relay permissions.
  */
-export const ROOM_IDLE_TTL_MS = 6 * 60 * 60 * 1000;
+export const ROOM_IDLE_TTL_MS = 60_000;
+export const DISCONNECT_CLOSE_GRACE_MS = 30_000;
 const MAX_LEVEL_INDEX = 41;
 
 function sanitizeName(raw) {
@@ -25,6 +26,7 @@ export function createRoomRecord(code, _levelIndex = 0, now = Date.now()) {
     started: false,
     hostId: '',
     lastActiveAt: now,
+    disconnectCloseAt: null,
     seats: [
       { seat: 0, role: 'host', character: 'momo', occupant: 'open', playerId: null, playerName: undefined, connected: false },
       { seat: 1, role: 'guest', character: 'mimi', occupant: 'open', playerId: null, playerName: undefined, connected: false },
@@ -33,10 +35,27 @@ export function createRoomRecord(code, _levelIndex = 0, now = Date.now()) {
   };
 }
 
+export function getRoomCloseReason(record, now = Date.now()) {
+  if (!record) return null;
+  if (typeof record.disconnectCloseAt === 'number' && now >= record.disconnectCloseAt) {
+    const anyOnline = record.seats.some((s) => s.occupant === 'human' && s.connected);
+    return anyOnline ? 'partner_left' : 'both_left';
+  }
+  if (record.lastActiveAt && now - record.lastActiveAt > ROOM_IDLE_TTL_MS) {
+    return 'inactivity';
+  }
+  return null;
+}
+
 export function isRoomExpired(record, now = Date.now()) {
-  if (!record) return false;
-  if (!record.lastActiveAt) return false;
-  return now - record.lastActiveAt > ROOM_IDLE_TTL_MS;
+  return getRoomCloseReason(record, now) !== null;
+}
+
+export function nextRoomAlarmAt(record, now = Date.now()) {
+  const idleAt = (record?.lastActiveAt ?? now) + ROOM_IDLE_TTL_MS;
+  return typeof record?.disconnectCloseAt === 'number'
+    ? Math.min(idleAt, record.disconnectCloseAt)
+    : idleAt;
 }
 
 export function isRoomCodeOccupied(record, now = Date.now()) {
@@ -79,11 +98,13 @@ export function joinRoom(record, playerId, rawName, now = Date.now(), deviceId) 
   if (idx === 0) hostId = playerId;
   if (deviceId) seatDeviceIds[idx] = deviceId;
 
+  const anyDisconnectedHuman = seats.some((s) => s.occupant === 'human' && !s.connected);
   return {
     ...record,
     hostId,
     seats,
     seatDeviceIds,
+    disconnectCloseAt: anyDisconnectedHuman ? record.disconnectCloseAt : null,
     lastActiveAt: now,
   };
 }
@@ -92,7 +113,8 @@ export function disconnectPlayer(record, playerId, now = Date.now()) {
   const idx = record.seats.findIndex((s) => s.playerId === playerId);
   if (idx < 0) return record;
   const seats = record.seats.map((s, i) => (i === idx ? { ...s, connected: false } : s));
-  return { ...record, seats, lastActiveAt: now };
+  const disconnectCloseAt = record.disconnectCloseAt ?? (now + DISCONNECT_CLOSE_GRACE_MS);
+  return { ...record, seats, disconnectCloseAt, lastActiveAt: now };
 }
 
 export function markDisconnectedIfMissingSockets(record, activePlayerIds, now = Date.now()) {
@@ -104,7 +126,9 @@ export function markDisconnectedIfMissingSockets(record, activePlayerIds, now = 
     }
     return s;
   });
-  return changed ? { ...record, seats, lastActiveAt: now } : record;
+  if (!changed) return record;
+  const disconnectCloseAt = record.disconnectCloseAt ?? (now + DISCONNECT_CLOSE_GRACE_MS);
+  return { ...record, seats, disconnectCloseAt, lastActiveAt: now };
 }
 
 export function snapshotForPlayer(record, playerId) {
@@ -123,6 +147,7 @@ export function snapshotForPlayer(record, playerId) {
     })),
     yourSeat: seatObj ? seatObj.seat : null,
     isHost: Boolean(seatObj && seatObj.seat === 0),
+    disconnectCloseAt: record.disconnectCloseAt ?? null,
   };
 }
 
@@ -247,6 +272,7 @@ export function handleRoomAction(record, playerId, msg, now = Date.now()) {
         seats,
         seatDeviceIds,
         started: false,
+        disconnectCloseAt: seats.some((s) => s.occupant === 'human') ? (now + DISCONNECT_CLOSE_GRACE_MS) : null,
         lastActiveAt: now,
       };
       return {

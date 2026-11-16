@@ -7,11 +7,13 @@ import {
   ROOM_IDLE_TTL_MS,
   createRoomRecord,
   disconnectPlayer,
+  getRoomCloseReason,
   handleRoomAction,
   isRoomCodeOccupied,
   isRoomExpired,
   joinRoom,
   markDisconnectedIfMissingSockets,
+  nextRoomAlarmAt,
   snapshotForPlayer,
 } from './roomLogic.js';
 
@@ -117,15 +119,26 @@ export class DontTrustRoomDO extends DurableObject {
     const now = Date.now();
     const touched = { ...next, lastActiveAt: touchActivity ? now : (next.lastActiveAt ?? now) };
     this.room = touched;
+    if (touchActivity) this.lastActivityPersistAt = now;
     await this.ctx.storage.put('room', touched);
-    await this.ctx.storage.setAlarm(touched.lastActiveAt + ROOM_IDLE_TTL_MS);
+    await this.ctx.storage.setAlarm(nextRoomAlarmAt(touched, now));
   }
 
   async alarm() {
     const now = Date.now();
     if (!this.room || isRoomExpired(this.room, now)) {
+      const reason = getRoomCloseReason(this.room, now) ?? 'inactivity';
+      const message = reason === 'partner_left'
+        ? 'Partner left and did not reconnect within 30s — Room closed!'
+        : reason === 'both_left'
+          ? 'Both players left the game — Room closed!'
+          : 'Room closed after 1 minute of inactivity.';
+      const payload = JSON.stringify({ type: 'room_closed', reason, message });
       for (const sock of this.ctx.getWebSockets()) {
-        try { sock.close(1000, 'Room expired after inactivity'); } catch { /* ignore */ }
+        try {
+          if (sock.readyState === WebSocket.OPEN) sock.send(payload);
+          sock.close(4004, message);
+        } catch { /* ignore */ }
       }
       this.room = null;
       await this.ctx.storage.deleteAll();
@@ -137,7 +150,7 @@ export class DontTrustRoomDO extends DurableObject {
       await this.saveRoom(swept, { touchActivity: false });
       this.broadcastSnapshots(swept);
     } else {
-      await this.ctx.storage.setAlarm(this.room.lastActiveAt + ROOM_IDLE_TTL_MS);
+      await this.ctx.storage.setAlarm(nextRoomAlarmAt(this.room, now));
     }
   }
 
@@ -262,6 +275,8 @@ export class DontTrustRoomDO extends DurableObject {
       if (swept !== this.room) {
         await this.saveRoom(swept, { touchActivity: false });
         this.broadcastSnapshots(swept);
+      } else if (now - (this.lastActivityPersistAt ?? 0) > 15_000) {
+        await this.saveRoom(this.room, { touchActivity: true });
       }
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'pong' }));
       return;

@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   ROOM_IDLE_TTL_MS,
+  DISCONNECT_CLOSE_GRACE_MS,
   createRoomRecord,
   joinRoom,
   disconnectPlayer,
   handleRoomAction,
   snapshotForPlayer,
   isRoomExpired,
+  getRoomCloseReason,
 } from './roomLogic.js';
 
 describe('worker 2-player co-op room state machine', () => {
@@ -99,9 +101,31 @@ describe('worker 2-player co-op room state machine', () => {
     expect(afterHostLeave.record.started).toBe(false);
   });
 
-  it('expires idle rooms after ROOM_IDLE_TTL_MS', () => {
-    const room = createRoomRecord('482910375', 0, 1000);
-    expect(isRoomExpired(room, 1000 + ROOM_IDLE_TTL_MS - 1)).toBe(false);
-    expect(isRoomExpired(room, 1000 + ROOM_IDLE_TTL_MS + 1)).toBe(true);
+  it('expires idle rooms after 1 minute (ROOM_IDLE_TTL_MS) and disconnected rooms after 30s', () => {
+    expect(ROOM_IDLE_TTL_MS).toBe(60_000);
+    expect(DISCONNECT_CLOSE_GRACE_MS).toBe(30_000);
+
+    let room = createRoomRecord('482910375', 0, 1000);
+    expect(isRoomExpired(room, 1000 + 60_000 - 1)).toBe(false);
+    expect(isRoomExpired(room, 1000 + 60_000 + 1)).toBe(true);
+    expect(getRoomCloseReason(room, 1000 + 60_000 + 1)).toBe('inactivity');
+
+    room = joinRoom(room, 'p1', 'Momo', 2000, 'd1');
+    room = joinRoom(room, 'p2', 'Mimi', 2100, 'd2');
+    room = disconnectPlayer(room, 'p2', 3000);
+    expect(room.disconnectCloseAt).toBe(3000 + 30_000);
+    expect(isRoomExpired(room, 3000 + 29_999)).toBe(false);
+    expect(isRoomExpired(room, 3000 + 30_000)).toBe(true);
+    expect(getRoomCloseReason(room, 3000 + 30_000)).toBe('partner_left');
+
+    // Rejoining within 30s clears disconnectCloseAt
+    const rejoined = joinRoom(room, 'p2', 'Mimi', 5000, 'd2');
+    expect(rejoined.disconnectCloseAt).toBeNull();
+    expect(isRoomExpired(rejoined, 5000 + 40_000)).toBe(false);
+
+    // Both disconnect -> 'both_left' after 30s
+    let bothOff = disconnectPlayer(rejoined, 'p1', 10_000);
+    bothOff = disconnectPlayer(bothOff, 'p2', 11_000);
+    expect(getRoomCloseReason(bothOff, 10_000 + 30_000)).toBe('both_left');
   });
 });

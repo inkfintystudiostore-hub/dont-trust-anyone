@@ -79,6 +79,22 @@ export const hud = {
   coopControls(isCoop) {
     const leaveBtn = $('btn-leave');
     if (leaveBtn) leaveBtn.hidden = !isCoop;
+    const pres = $('coop-presence');
+    if (pres && !isCoop) pres.hidden = true;
+  },
+  coopPresence(snap) {
+    const el = $('coop-presence');
+    if (!el) return;
+    if (!snap || !snap.seats) { el.hidden = true; return; }
+    el.hidden = false;
+    const online = snap.seats.filter((s) => s.occupant === 'human' && s.connected).length;
+    if (online >= 2) {
+      el.textContent = '🟢 2/2 Online';
+      el.style.color = '#1b7a4b';
+    } else {
+      el.textContent = '🟡 Partner Offline (30s)';
+      el.style.color = '#b45309';
+    }
   },
   portraitHint(show) { $('rotate-hint').hidden = !show; },
   iris(onDone, reducedMotion = false) {

@@ -51,6 +51,14 @@ export function createCoopLobby(_levels, callbacks) {
       $('coop-status').textContent = t('coop.waitP2');
       callbacks.onPeerLeft?.();
     },
+    onRoomClosed(reason, message) {
+      currentCode = null;
+      latestSnapshot = null;
+      $('coop-code').textContent = '--- --- ---';
+      renderRoster(null);
+      $('coop-status').textContent = message || 'Room closed.';
+      callbacks.onRoomClosed?.(reason, message);
+    },
     onError(msg) {
       $('coop-status').textContent = msg;
     },
@@ -74,7 +82,8 @@ export function createCoopLobby(_levels, callbacks) {
       nameDiv.textContent = s.occupant === 'human' ? s.playerName : 'Waiting…';
       const meta = document.createElement('div');
       meta.className = 'seat-meta';
-      meta.textContent = `${s.seat === 0 ? 'P1 Momo' : 'P2 Mimi'}${isMe ? ' · YOU' : ''}`;
+      const statusTxt = s.occupant === 'human' ? (s.connected ? 'Online' : 'Offline') : 'Open';
+      meta.textContent = `${s.seat === 0 ? 'P1 Momo' : 'P2 Mimi'} · ${statusTxt}${isMe ? ' · YOU' : ''}`;
       info.append(nameDiv, meta);
       card.append(dot, info);
       rosterEl.appendChild(card);

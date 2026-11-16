@@ -180,6 +180,15 @@ export function createCoopSession(handlers) {
         case 'restart': handlers.onRestart?.(data.by); break;
         case 'emote': handlers.onEmote?.(data.fromSeat, data.emote); break;
         case 'peer_left': handlers.onPeerLeft?.(data.seat); break;
+        case 'room_closed':
+          intentionalClose = true;
+          activeParams = null;
+          connectedOnce = false;
+          clearTimers();
+          notifyParentRoomCode(null);
+          clearRoomFromBrowserUrl();
+          handlers.onRoomClosed?.(data.reason, data.message);
+          break;
         case 'error': handlers.onError?.(data.message); break;
         default: break;
       }
