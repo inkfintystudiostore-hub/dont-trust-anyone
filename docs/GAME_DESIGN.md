@@ -278,6 +278,19 @@ Trap tuning: `traps: [{ at: 'D', runTo: 'T', radius: 2.2 }, { at: 'S', delay: 0.
 | **Paired Ticking Bomb** ✅ | `@` | Proximity fuse countdown (`ticking_bomb.glb`); ek partner bomb defuse karta hai jab doosra partner `H` button daba ke support de — time 0 pe kaboom! Shared-fate death! |
 | **Peek-a-Boo Watchtower** ✅ | `Q` + `H` | Ek partner plate par khada hoke Ghost ki taraf dekhe (freeze) tab doosra partner cross kare |
 
+### 5.8.1 New Progressive & Funny Traps ✅ (`!` `%` `$` `~` `+`)
+| Trap | Char | Visual / Model | Trigger & Funny Effect | Co-op Twist |
+|---|---|---|---|---|
+| **Spring Trap** ✅ | `!` | Normal ground tile (zero red hints!) → reveals `spring_pad.glb` | `0.08s` delay → catapults player skyward (`vy = 21.5`) into ceiling spikes unless jumped; resets `0.9s` | Holding `H` (`channelA`) pins `!` down |
+| **Magnet Orb** ✅ | `%` | Hovering `magnet_orb.glb` | Pulls jump arcs sideways via `beltVx` over pits/hazards | Holding `h` (`channelB`) reverses polarity to boost partner forward |
+| **Pie Cannon** ✅ | `$` | `pie_cannon.glb` | Fires cream pie projectile → splats player (`1.4s` slow `0.65×` + knockback `9.5`) | Jump over pie or time cooldown (`2.2s`) |
+| **Disco Floor** ✅ | `~` | Normal ground tile (zero red hints!) → neon pink pulse | Triggers `1.1s` uncontrollable funky dance bounce (`danceTimer`) | Holding `h` (`channelB`) pauses the disco beat |
+| **Sync Plate** ✅ | `+` | Amber twin `coop_switch.glb` | Both partners must step on `+` within `0.9s` to latch `=` gates open for `2.5s` | Synchronized couple countdown |
+
+### 5.8.2 Character Animations (`src/render/momo.js`) ✅
+- **Per-trap reactions:** `boing`/`launch` (stretch + flail), `slip` (windmilling spin), `pie` (wobbling splat stagger), `disco` (side-to-side funk groove + bounce), `punch`/`sneeze` (horizontal recoil), `bonk` (dizzy head wobble), `flip` (barrel roll), `magnetPull` (tilt strain), `sticky` (squat).
+- **Per-death poses:** `crushed`/`boulder` (flat pancake), `pit` (stretched plummet), `bomb` (rocket spin + char shrink), `gate`/`spikes`/`chomp`/`robot`/`ghost` (electric pop/jitter).
+
 ### 5.9 Trap combos (jo sabse zyada gussa dilaate hain)
 1. **Sign + Nakli floor:** "Safe ➜" seedha nakli pul ki taraf (L3 ✅).
 2. **Gap + Invisible block:** normal jump pe thappad, gaddhe mein (L2 ✅).

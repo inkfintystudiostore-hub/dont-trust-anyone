@@ -49,6 +49,11 @@ const TRAP_BUILDERS = {
   h: (base) => ({ kind: 'plateB', ...base, channel: 'B' }),
   '-': (base) => ({ kind: 'gateB', ...base, channel: 'B' }),
   '@': (base, cfg) => ({ kind: 'bomb', ...base, fuse: cfg.fuse ?? 12.0, defuseTime: cfg.defuseTime ?? 1.2, triggerDist: cfg.triggerDist ?? 6.5 }),
+  '!': (base, cfg) => ({ kind: 'springTrap', ...base, delay: cfg.delay ?? 0.08, boost: cfg.boost ?? 21.5, cooldown: cfg.cooldown ?? 0.9 }),
+  '%': (base, cfg) => ({ kind: 'magnetOrb', ...base, radius: cfg.radius ?? 4.2, force: cfg.force ?? 16.0 }),
+  '$': (base, cfg) => ({ kind: 'pieCannon', ...base, dir: cfg.dir ?? -1, range: cfg.range ?? cfg.triggerDist ?? 5.8, speed: cfg.speed ?? 11.5, cooldown: cfg.cooldown ?? 2.2 }),
+  '~': (base, cfg) => ({ kind: 'discoFloor', ...base, duration: cfg.duration ?? 1.1 }),
+  '+': (base) => ({ kind: 'syncPlate', ...base }),
 };
 
 export function parseLevel({ name, world = 1, coopOnly = false, rows, traps = [], signs = [], taunts = [] }) {

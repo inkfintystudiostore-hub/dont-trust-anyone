@@ -126,20 +126,21 @@ describe('World 5 Couples Co-op 0-death solutions (L36-L42)', () => {
     expect(g.deaths).toBe(0);
   });
 
-  it('L38: Overhead Bridge Shield (P0 climbs bridge to H while P1 crosses === & grabs *)', () => {
+  it('L38: Sync Bridge Shield (both hit + together to latch === while P1 grabs * & holds H)', () => {
     const g = playCoop(37, (p0, p1, game, _f, st) => {
       st.phase ??= 0;
       const doorX = game.door.x;
       if (st.phase === 0) {
-        // P0 climbs up to upper platform (cols 6..11, y=4) and stands on H (9.5)
+        // P0 climbs upper bridge to + (9.5), P1 stands on lower + (9.5) to latch === open for 2.5s
         const jumpUp = p0.y < 3.5 && p0.x >= 4.4 && p0.x <= 5.4;
-        if (game.keysLeft === 0 && p1.x >= 20.2) st.phase = 1;
-        // P1 waits safely at 11.5 until channelA is open, then crosses === (13..16), grabs * (18.5), stands on H (20.5)
-        const p1Target = game.channelA ? (game.keysLeft > 0 ? 18.5 : 20.5) : 11.5;
-        return [moveTo(p0, 9.5, { jumpIf: jumpUp }), moveTo(p1, p1Target)];
+        if (game.syncLatch > 0.2) st.phase = 1;
+        return [moveTo(p0, 9.5, { jumpIf: jumpUp }), moveTo(p1, 9.5)];
       }
-      // P1 holds right H (20.5) while P0 drops off bridge and crosses ===
-      if (p0.x < 19.5) return [moveTo(p0, 20.5), moveTo(p1, 20.5)];
+      if (st.phase === 1) {
+        // Both rush across latched ===! P1 grabs * (18.5) & holds H (20.5), P0 drops off bridge and crosses ===
+        if (game.keysLeft === 0 && p1.x >= 20.2 && p0.x >= 19.5) st.phase = 2;
+        return [moveTo(p0, 20.5), moveTo(p1, game.keysLeft > 0 ? 18.5 : 20.5)];
+      }
       return [moveTo(p0, doorX), moveTo(p1, doorX)];
     });
     expect(g.finished).toBe(true);
@@ -178,18 +179,23 @@ describe('World 5 Couples Co-op 0-death solutions (L36-L42)', () => {
     expect(g.deaths).toBe(0);
   });
 
-  it('L40: Peek-a-Boo Ghost Watchtower (stare right to freeze Q while partner crosses)', () => {
+  it('L40: Peek-a-Boo Ghost + Magnet Watchtower (hold H then h to reverse % & freeze Q)', () => {
     const g = playCoop(39, (p0, p1, game, _f, st) => {
       st.phase ??= 0;
       const doorX = game.door.x;
       if (st.phase === 0) {
-        // P0 stands on left H (6.5) facing RIGHT to freeze Q
-        if (game.keysLeft === 0 && p1.x >= 22.2) st.phase = 1;
-        const in0 = Math.abs(p0.x - 6.5) > 0.14
-          ? moveTo(p0, 6.5)
+        // P0 stands on H (6.5) while P1 crosses = to 13.5
+        if (p1.x >= 13.5) st.phase = 1;
+        return [moveTo(p0, 6.5), moveTo(p1, 13.5)];
+      }
+      if (st.phase === 1) {
+        // P0 moves to h (9.5) facing RIGHT (freezes Q + reverses % to boost P1!) while P1 grabs * (19.5) and holds H (22.5)
+        if (game.keysLeft === 0 && p1.x >= 22.2 && p1.onGround) st.phase = 2;
+        const in0 = Math.abs(p0.x - 9.5) > 0.14
+          ? moveTo(p0, 9.5)
           : { right: p0.face < 0, left: false, jump: false };
         const ghost = game.traps.find((t) => t.kind === 'booGhost');
-        const jumpQ = ghost && Math.abs(ghost.x - p1.x) < 1.3 && p1.x < ghost.x;
+        const jumpQ = ghost && Math.abs(ghost.x - p1.x) < 1.6 && p1.x < ghost.x;
         return [in0, moveTo(p1, game.keysLeft > 0 ? 19.5 : 22.5, { jumpIf: !!jumpQ })];
       }
       // P1 holds right H (22.5) facing LEFT to keep Q frozen while P0 walks/jumps past Q
@@ -198,7 +204,7 @@ describe('World 5 Couples Co-op 0-death solutions (L36-L42)', () => {
           ? moveTo(p1, 22.5)
           : { left: p1.face > 0, right: false, jump: false };
         const ghost = game.traps.find((t) => t.kind === 'booGhost');
-        const jumpQ = ghost && Math.abs(ghost.x - p0.x) < 1.3 && p0.x < ghost.x;
+        const jumpQ = ghost && Math.abs(ghost.x - p0.x) < 1.6 && p0.x < ghost.x;
         return [moveTo(p0, 22.5, { jumpIf: !!jumpQ }), in1];
       }
       return [moveTo(p0, doorX), moveTo(p1, doorX)];
@@ -213,7 +219,7 @@ describe('World 5 Couples Co-op 0-death solutions (L36-L42)', () => {
       const doorX = game.door.x;
       if (st.phase === 0) {
         // P0 holds left H (4.5). P1 crosses = (10.5), jumps LLL (11..15) at 11.2, grabs *1 (16.5), goes to H (18.5)
-        if (game.keysLeft <= 1 && p1.x >= 18.2) st.phase = 1;
+        if (game.keysLeft <= 1 && p1.x >= 18.3 && p1.onGround) st.phase = 1;
         const jumpL1 = p1.x >= 11.1 && p1.x <= 11.7;
         return [moveTo(p0, 4.5), moveTo(p1, game.keysLeft === 2 ? 16.5 : 18.5, { jumpIf: jumpL1 })];
       }
@@ -257,12 +263,15 @@ describe('World 5 Couples Co-op 0-death solutions (L36-L42)', () => {
         return [moveTo(p0, 24.5), in1];
       }
       if (st.phase === 2) {
-        // P0 holds left h (24.5) facing right, P1 jumps Q (26.5) -> crosses - (29.5) -> holds right h (32.5)
-        if (p1.x >= 32.2) st.phase = 3;
+        // P0 holds left h (24.5) facing right, P1 jumps Q (26.5) -> takes pie hit if needed -> crosses - (29.5) -> holds right h (32.5)
+        if (p1.x >= 32.2 && p1.onGround) st.phase = 3;
         const in0 = Math.abs(p0.x - 24.5) > 0.14 ? moveTo(p0, 24.5) : { right: p0.face < 0, left: false, jump: false };
-        const ghost = game.traps.find((t) => t.kind === 'booGhost');
-        const jumpQ = ghost && Math.abs(ghost.x - p1.x) < 1.3 && p1.x < ghost.x;
-        return [in0, moveTo(p1, 32.5, { jumpIf: !!jumpQ })];
+        const pie = game.traps.find((t) => t.kind === 'pieCannon');
+        const jumpPie = pie && pie.state === 'flying' && pie.x - p1.x < 1.8 && pie.x > p1.x;
+        const in1 = p1.x < 26.8
+          ? { right: true, left: false, jump: p1.x >= 24.8 && p1.x <= 26.5 }
+          : moveTo(p1, 32.5, { jumpIf: !!jumpPie });
+        return [in0, in1];
       }
       // Phase 3: P1 holds right h (32.5) facing LEFT while P0 jumps Q (26.5) and crosses - (29.5), then both go to D
       if (!p0.atDoor && p0.x < 30.2) {

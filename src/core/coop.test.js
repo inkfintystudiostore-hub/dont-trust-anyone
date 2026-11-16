@@ -277,4 +277,43 @@ describe('analog moveX + co-op coordination traps', () => {
     expect(coopL35.finished).toBe(false);
     expect(coopL35.levelIndex).toBe(35); // Advances straight into L36 together!
   });
+
+  it('syncPlate (+) requires BOTH partners to step on twin plates within sync window to open gates', () => {
+    const level = lvl({
+      rows: [
+        '................',
+        'P..+...+..=...D.',
+        '################',
+      ],
+    });
+    const g = createGame([level], 0, { coop: true });
+    // P1 alone stands on first + -> gate stays closed
+    runCoop(g, RIGHT, NONE, 28);
+    expect(g.syncActive).toBe(false);
+    expect(g.traps.find((t) => t.kind === 'gateA').open).toBe(false);
+
+    // P2 walks to second + while P1 is still within 0.9s window -> sync latches open!
+    const ev = runCoop(g, NONE, RIGHT, 65);
+    expect(g.syncActive).toBe(true);
+    expect(g.traps.find((t) => t.kind === 'gateA').open).toBe(true);
+    expect(ev.some((e) => e.type === 'gateOpen' && e.channel === 'SYNC')).toBe(true);
+  });
+
+  it('co-op Mint switch (h) reverses magnetOrb (%) polarity to boost partner forward', () => {
+    const level = lvl({
+      rows: [
+        '..................',
+        '........%.........',
+        'P.h.............D.',
+        '##################',
+      ],
+    });
+    const g = createGame([level], 0, { coop: true });
+    runCoop(g, RIGHT, NONE, 84); // P1 crosses past % (x=8.5 -> ~9.2) while h is off
+    runCoop(g, NONE, RIGHT, 16); // P2 steps onto h (x=2.5, outside magnet radius) -> channelB flips polarity!
+    const xBefore = g.players[0].x;
+    runCoop(g, NONE, NONE, 20);
+    expect(g.channelB).toBe(true);
+    expect(g.players[0].x).toBeGreaterThan(xBefore + 0.08);
+  });
 });

@@ -63,6 +63,9 @@ Purani SVG drawings (`assets/concepts/`) ab sirf rough guide hain. Asli referenc
 | 16 | Peek-a-boo ghost ✅ **done** | `cute_ghost.glb` | Mind Games | smooth cream-to-lavender marshmallow ghost figurine with tiny scalloped tail and nub arms, no eyes, no mouth, chunky resin toy |
 | 17 | Golden Co-op Key ✅ **done** (86 KB compressed) | `golden_key.glb` | World 5 (Couple Co-op) | cute ornate glossy pastel-gold skeleton key prop, smooth resin toy finish, no face |
 | 18 | Ticking Co-op Bomb ✅ **done** (163 KB compressed) | `ticking_bomb.glb` | World 5 (Couple Co-op) | classic smooth matte charcoal round cartoon bomb with gold brass collar and twisted cream rope fuse, no face |
+| 19 | Spring Trap Pad ✅ **done** (162 KB compressed) | `spring_pad.glb` | World 2 / 4 / 5 | coiled gold toy spring on crimson/cream pad (`!` disguised under normal tile), no face |
+| 20 | Magnet Pull Orb ✅ **done** (182 KB compressed) | `magnet_orb.glb` | World 3 / 4 / 5 | glossy coral-red U-magnet with silver tips (`%`), no face |
+| 21 | Cream Pie Cannon ✅ **done** (261 KB compressed) | `pie_cannon.glb` | World 2 / 3 / 4 | chunky pastel coral toy cannon on oak wheel mount (`$`), no face |
 
 **M3 wale (9) sabse pehle**, M4 wale (4) baad mein.
 

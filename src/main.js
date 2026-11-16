@@ -77,6 +77,7 @@ try {
     banana_peel: 0.42, rubber_chicken: 0.75, boxing_glove: 0.75, checkpoint_flag: 1.1,
     gift_box: 0.9, toy_robot: 0.95, cute_ghost: 0.95,
     coop_switch: 0.45, golden_key: 0.28, ticking_bomb: 0.85,
+    spring_pad: 0.65, magnet_orb: 0.8, pie_cannon: 0.85,
   });
 } catch (err) {
   const titleEl = $('loading').querySelector('h1');
@@ -582,6 +583,9 @@ function onEvent(e) {
       else if (e.kind === 'sneezeCloud') sfx.sneeze();
       else if (e.kind === 'gravityFlip' || e.kind === 'controlsFlip') sfx.flip();
       else if (e.kind === 'launchFloor') sfx.launch();
+      else if (e.kind === 'springTrap') sfx.spring();
+      else if (e.kind === 'pieCannon') sfx.pie();
+      else if (e.kind === 'discoFloor') sfx.disco();
       else if (e.kind === 'antiJump') sfx.antiJump();
       else if (e.kind === 'boulder') sfx.rumble();
       else sfx.trap();

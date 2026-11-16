@@ -120,6 +120,9 @@ export const sfx = {
   defused: () => [523, 659, 784, 1046, 1319].forEach((f, i) => tone('triangle', f, f, 0.1, 0.08, i * 0.05)),
   boom: () => { tone('sawtooth', 160, 32, 0.45, 0.18); noiseBurst(0.35, 0.18); },
   locked: () => { tone('square', 220, 180, 0.08, 0.08); tone('square', 170, 140, 0.1, 0.08, 0.09); },
+  spring: () => { tone('triangle', 220, 1120, 0.22, 0.13); tone('sine', 440, 1320, 0.18, 0.08, 0.05); },
+  pie: () => { noiseBurst(0.16, 0.15); tone('sine', 340, 140, 0.14, 0.11); },
+  disco: () => [523, 659, 784, 988, 1046].forEach((f, i) => tone('square', f, f * 1.03, 0.07, 0.055, i * 0.06)),
   win: () => [523, 659, 784, 1046].forEach((f, i) => tone('square', f, f, 0.12, 0.07, i * 0.09)),
   babble: () => { for (let i = 0; i < 6; i++) { const f = 500 + Math.random() * 500; tone('square', f, f * 0.9, 0.05, 0.035, i * 0.06); } },
 };

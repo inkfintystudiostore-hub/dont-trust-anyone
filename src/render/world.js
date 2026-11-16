@@ -24,6 +24,7 @@ const GEO = {
   laserBar: new CylinderGeometry(0.06, 0.06, 0.96, 10),
   bombBar: new BoxGeometry(0.86, 0.1, 0.1),
   lockBody: new BoxGeometry(0.42, 0.36, 0.14),
+  pie: new SphereGeometry(0.24, 12, 10),
   backdrop: new PlaneGeometry(1, 1),
   shadowDisc: new CircleGeometry(0.42, 20),
 };
@@ -75,6 +76,8 @@ const MAT = {
   spike: new MeshStandardMaterial({ color: '#c4213a', roughness: 0.4 }),
   mystery: new MeshStandardMaterial({ color: '#8b0d1a', roughness: 0.35 }),
   plateMint: new MeshStandardMaterial({ color: '#45c49e', emissive: '#2da683', emissiveIntensity: 0.25, roughness: 0.45 }),
+  syncAmber: new MeshStandardMaterial({ color: '#ffb703', emissive: '#f59e0b', emissiveIntensity: 0.3, roughness: 0.4 }),
+  disco: new MeshStandardMaterial({ color: '#ff8fab', emissive: '#ff4d6d', emissiveIntensity: 0.45, roughness: 0.4 }),
   laserA: new MeshStandardMaterial({ color: '#ff2e63', emissive: '#ff1f5a', emissiveIntensity: 0.9, transparent: true, opacity: 0.88 }),
   laserB: new MeshStandardMaterial({ color: '#2ec4b6', emissive: '#20b2a5', emissiveIntensity: 0.9, transparent: true, opacity: 0.88 }),
   bombBarBg: new MeshStandardMaterial({ color: '#2b2421', roughness: 0.8 }),
@@ -389,6 +392,51 @@ export function buildWorld(scene, level, models) {
       v.userData.fuseFill = fuseFill;
       v.userData.defuseFill = defuseFill;
       v.position.set(d.cx + 0.5, d.cy, 0);
+    } else if (d.kind === 'springTrap') {
+      v = new Group();
+      const body = new Mesh(GEO.block, theme.dirt);
+      const grass = new Mesh(GEO.grass, theme.grass);
+      grass.position.y = 0.42;
+      const pad = models.spring_pad.clone(true);
+      pad.visible = false;
+      pad.position.y = 0.05;
+      v.add(body, grass, pad);
+      v.userData.pad = pad;
+      v.position.set(d.cx + 0.5, d.cy + 0.5, 0);
+    } else if (d.kind === 'magnetOrb') {
+      v = models.magnet_orb.clone(true);
+      v.position.set(d.cx + 0.5, d.cy + 0.45, 0);
+    } else if (d.kind === 'pieCannon') {
+      v = new Group();
+      const cannon = models.pie_cannon.clone(true);
+      cannon.rotation.y = d.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+      const pieMesh = new Mesh(GEO.pie, MAT.eyeWhite);
+      pieMesh.scale.set(1.15, 0.72, 1.15);
+      pieMesh.visible = false;
+      v.add(cannon, pieMesh);
+      v.userData.cannon = cannon;
+      v.userData.pieMesh = pieMesh;
+      v.position.set(d.cx + 0.5, d.cy, 0);
+    } else if (d.kind === 'discoFloor') {
+      v = new Group();
+      const body = new Mesh(GEO.block, theme.dirt);
+      const grass = new Mesh(GEO.grass, theme.grass);
+      grass.position.y = 0.42;
+      v.add(body, grass);
+      v.userData.top = grass;
+      v.userData.baseGrass = theme.grass;
+      v.position.set(d.cx + 0.5, d.cy + 0.5, 0);
+    } else if (d.kind === 'syncPlate') {
+      v = models.coop_switch.clone(true);
+      v.traverse((o) => {
+        if (o.isMesh && o.material) {
+          const m = o.material.clone();
+          m.color?.set('#ffb703');
+          o.material = m;
+          owned.push(m);
+        }
+      });
+      v.position.set(d.cx + 0.5, d.cy, 0);
     }
 
     if (v) {
@@ -673,6 +721,38 @@ export function buildWorld(scene, level, models) {
             }
           }
         }
+      } else if (tr.kind === 'springTrap') {
+        const pad = v.userData.pad;
+        if (pad) {
+          pad.visible = tr.state !== 'idle';
+          pad.position.y = 0.1 + (tr.offsetY ?? 0);
+        }
+        v.position.x = tr.cx + 0.5 + (tr.state === 'shaking' ? Math.sin(time * 90) * 0.05 : 0);
+      } else if (tr.kind === 'magnetOrb') {
+        const rev = !!(g.coop && g.channelB);
+        v.rotation.y += (rev ? -4.8 : 2.2) * dt;
+        v.position.y = tr.cy + 0.45 + Math.sin(time * 4 + tr.cx) * 0.08;
+      } else if (tr.kind === 'pieCannon') {
+        const { cannon, pieMesh } = v.userData;
+        if (cannon) {
+          const targetS = tr.state === 'charging' ? 0.85 : 1.0;
+          cannon.scale.x += (targetS - cannon.scale.x) * k(18);
+        }
+        if (pieMesh) {
+          pieMesh.visible = tr.state === 'flying';
+          if (pieMesh.visible) {
+            pieMesh.position.set(tr.x - (tr.cx + 0.5), tr.y - tr.cy, 0);
+            pieMesh.rotation.z += 10 * dt;
+          }
+        }
+      } else if (tr.kind === 'discoFloor') {
+        if (v.userData.top) {
+          v.userData.top.material = tr.active ? MAT.disco : v.userData.baseGrass;
+        }
+        v.scale.y = tr.active ? 1 + Math.abs(Math.sin(time * 22)) * 0.1 : 1;
+      } else if (tr.kind === 'syncPlate') {
+        const ty = tr.pressed ? 0.55 : 1.0;
+        v.scale.y += (ty - v.scale.y) * k(22);
       }
     }
 
@@ -789,6 +869,19 @@ export function buildWorld(scene, level, models) {
         if (v.userData.fuseBg) v.userData.fuseBg.visible = false;
         if (v.userData.fuseFill) v.userData.fuseFill.visible = false;
         if (v.userData.defuseFill) v.userData.defuseFill.visible = false;
+      } else if (tr.kind === 'springTrap') {
+        v.position.set(tr.cx + 0.5, tr.cy + 0.5, 0);
+        if (v.userData.pad) { v.userData.pad.visible = false; v.userData.pad.position.y = 0.05; }
+      } else if (tr.kind === 'magnetOrb') {
+        v.position.set(tr.cx + 0.5, tr.cy + 0.45, 0);
+      } else if (tr.kind === 'pieCannon') {
+        if (v.userData.cannon) v.userData.cannon.scale.setScalar(1);
+        if (v.userData.pieMesh) v.userData.pieMesh.visible = false;
+      } else if (tr.kind === 'discoFloor') {
+        v.scale.y = 1;
+        if (v.userData.top && v.userData.baseGrass) v.userData.top.material = v.userData.baseGrass;
+      } else if (tr.kind === 'syncPlate') {
+        v.scale.y = tr.pressed ? 0.55 : 1.0;
       }
     }
   }

@@ -19,6 +19,7 @@ function createPlayerState() {
     x: 0, y: 0, prevX: 0, prevY: 0, vx: 0, vy: 0, onGround: false, coyote: 0, jumpBuf: 0,
     jumped: false, landed: false, face: 1, stun: 0, slip: 0, slipDir: 1, slipSpeed: 8.5,
     flipped: 0, beltVx: 0, speedMul: 1, jumpMul: 1, gravDir: 1, atDoor: false, prevJump: false,
+    pieTimer: 0, danceTimer: 0, magnetPull: 0, trapAnim: null, trapAnimTimer: 0,
     _lockedNotified: false,
     hit: { bonkCx: -1, bonkCy: -1, wallCx: -1, wallCy: -1 },
   };
@@ -30,7 +31,7 @@ export function createGame(levels, levelIndex = 0, opts = {}) {
   const g = {
     coop, levels, levelIndex, deaths: 0, levelDeaths: 0, killerTrapIndex: -1, lastTrapIndex: -1, lastTrapTime: -99,
     finished: false, time: 0, darkTimer: 0, keysTotal: 0, keysLeft: 0, channelA: false, channelB: false,
-    hasPlateA: false, hasPlateB: false,
+    hasPlateA: false, hasPlateB: false, syncActive: false, syncLatch: 0,
     dead: false, deadTimer: 0, deathCause: null, deathVictim: -1, prevJump: false,
     events: [], hit: players[0].hit,
     players,
@@ -66,14 +67,17 @@ function resetLevel(g) {
     ...d, state: 'idle', timer: 0, offsetY: 0, vx: 0, vy: 0, x: d.cx + 0.5, y: d.cy, prevX: d.cx + 0.5, prevY: d.cy,
     ext: 0, hit: false, hitMask: 0, insideMask: 0, shy: false, onGround: false, face: -1,
     revealed: false, active: false, armed: false, triggered: false, collected: false, pressed: false, open: false,
-    defuse: 0, defused: false, defusing: false, cooldown: 0, stopIndex: 0,
+    defuse: 0, defused: false, defusing: false, cooldown: 0, stopIndex: 0, syncTimer: 0,
   }));
   g.keysTotal = 0;
   g.hasPlateA = false;
   g.hasPlateB = false;
+  g.syncActive = false;
+  g.syncLatch = 0;
   for (const t of g.traps) {
     if (t.kind === 'fallingFloor' || t.kind === 'launchFloor' || t.kind === 'antiJump' ||
-        t.kind === 'invisibleBlock' || t.kind === 'conveyor' || t.kind === 'slowFloor') {
+        t.kind === 'invisibleBlock' || t.kind === 'conveyor' || t.kind === 'slowFloor' ||
+        t.kind === 'springTrap' || t.kind === 'discoFloor') {
       g.solid[t.cell] = 1;
     }
     if (t.kind === 'keyItem') g.keysTotal++;
@@ -94,6 +98,7 @@ function resetLevel(g) {
       onGround: false, coyote: 0, jumpBuf: 0, jumped: false, landed: false, face: 1,
       stun: 0, slip: 0, slipDir: 1, slipSpeed: 8.5, flipped: 0, beltVx: 0, speedMul: 1, jumpMul: 1,
       gravDir: 1, atDoor: false, prevJump: false, _lockedNotified: false,
+      pieTimer: 0, danceTimer: 0, magnetPull: 0, trapAnim: null, trapAnimTimer: 0,
     });
     p.hit.bonkCx = -1; p.hit.bonkCy = -1; p.hit.wallCx = -1; p.hit.wallCy = -1;
   }
@@ -175,6 +180,17 @@ export function step(g, inputOrInputs, dt) {
     const slipping = p.slip > 0;
     p.slip = Math.max(0, p.slip - dt);
     p.flipped = Math.max(0, p.flipped - dt);
+    p.pieTimer = Math.max(0, p.pieTimer - dt);
+    p.danceTimer = Math.max(0, p.danceTimer - dt);
+    p.trapAnimTimer = Math.max(0, p.trapAnimTimer - dt);
+    if (p.trapAnimTimer <= 0) p.trapAnim = null;
+    if (p.pieTimer > 0) p.speedMul *= 0.65;
+    if (p.danceTimer > 0 && p.onGround && !stunned) {
+      if (Math.floor(g.time * 8) !== Math.floor((g.time - dt) * 8)) {
+        p.vy = 4.6 * p.gravDir;
+        p.onGround = false;
+      }
+    }
     const rawWant = Number.isFinite(inp.moveX)
       ? Math.max(-1, Math.min(1, inp.moveX))
       : ((inp.right ? 1 : 0) - (inp.left ? 1 : 0));
@@ -254,14 +270,33 @@ function updateTraps(g, dt) {
     players[pi].beltVx = 0;
     players[pi].speedMul = 1;
     players[pi].jumpMul = 1;
+    players[pi].magnetPull = 0;
   }
 
   const prevA = g.channelA;
   const prevB = g.channelB;
+  const prevSync = g.syncActive;
   g.channelA = false;
   g.channelB = false;
+  let syncCount = 0;
+  let syncReady = 0;
   for (let i = 0; i < g.traps.length; i++) {
     const t = g.traps[i];
+    if (t.kind === 'syncPlate') {
+      syncCount++;
+      let on = false;
+      for (let pi = 0; pi < players.length; pi++) {
+        const p = players[pi];
+        if (!p.atDoor && p.onGround && p.x + PHYS.halfW > t.cx + 0.08 && p.x - PHYS.halfW < t.cx + 0.92 && Math.abs(p.y - t.cy) < 0.45) {
+          on = true;
+          break;
+        }
+      }
+      t.pressed = on;
+      t.syncTimer = on ? 0.9 : Math.max(0, (t.syncTimer ?? 0) - dt);
+      if (t.syncTimer > 0) syncReady++;
+      continue;
+    }
     if (t.kind !== 'plateA' && t.kind !== 'plateB') continue;
     let on = false;
     for (let pi = 0; pi < players.length; pi++) {
@@ -277,6 +312,12 @@ function updateTraps(g, dt) {
       else g.channelB = true;
     }
   }
+  g.syncLatch = Math.max(0, (g.syncLatch ?? 0) - dt);
+  if (syncCount >= 2 && syncReady === syncCount) {
+    g.syncLatch = 2.5;
+  }
+  g.syncActive = g.syncLatch > 0;
+  if (g.syncActive && !prevSync) emit(g, 'gateOpen', { channel: 'SYNC' });
   if (g.channelA && !prevA) emit(g, 'gateOpen', { channel: 'A' });
   if (g.channelB && !prevB) emit(g, 'gateOpen', { channel: 'B' });
 
@@ -321,6 +362,8 @@ function updateTraps(g, dt) {
               p.vy = p.gravDir > 0 ? Math.min(p.vy, -4) : Math.max(p.vy, 4);
               p.stun = STUN;
               p.slip = 0;
+              p.trapAnim = 'bonk';
+              p.trapAnimTimer = STUN;
               emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 });
               break;
             }
@@ -351,6 +394,8 @@ function updateTraps(g, dt) {
               p.slipDir = Math.abs(p.vx) > 0.2 ? Math.sign(p.vx) : p.face;
               p.slipSpeed = t.speed;
               p.vx = p.slipDir * t.speed;
+              p.trapAnim = 'slip';
+              p.trapAnimTimer = t.duration;
               emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.2 });
               break;
             }
@@ -369,6 +414,8 @@ function updateTraps(g, dt) {
               p.onGround = false;
               p.coyote = 0;
               p.slip = 0;
+              p.trapAnim = 'launch';
+              p.trapAnimTimer = 0.6;
               t.cooldown = 0.2;
               t.timer = 0.25;
               emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.3 });
@@ -484,6 +531,8 @@ function updateTraps(g, dt) {
                 p.vy = p.gravDir > 0 ? Math.max(p.vy, 5) : Math.min(p.vy, -5);
                 p.stun = 0.35;
                 p.slip = 0;
+                p.trapAnim = 'punch';
+                p.trapAnimTimer = 0.45;
               }
             }
           }
@@ -533,6 +582,8 @@ function updateTraps(g, dt) {
             if (!p.atDoor && overlaps(p, t.cx + 0.1, t.cy, t.cx + 0.9, t.cy + 1)) {
               t.triggered = true;
               p.flipped = t.duration;
+              p.trapAnim = 'flip';
+              p.trapAnimTimer = 0.6;
               emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 });
               break;
             }
@@ -546,6 +597,8 @@ function updateTraps(g, dt) {
           const hitZone = !p.atDoor && overlaps(p, t.cx + 0.15, t.cy, t.cx + 0.85, t.cy + 1);
           if (hitZone && !(t.insideMask & bit)) {
             p.gravDir *= -1;
+            p.trapAnim = 'flip';
+            p.trapAnimTimer = 0.6;
             p.onGround = false;
             p.coyote = 0;
             g.lastTrapIndex = i; g.lastTrapTime = g.time;
@@ -591,6 +644,8 @@ function updateTraps(g, dt) {
               p.vx = t.dir * t.power;
               p.stun = 0.25;
               p.slip = 0;
+              p.trapAnim = 'sneeze';
+              p.trapAnimTimer = 0.45;
               g.lastTrapIndex = i; g.lastTrapTime = g.time;
             }
           }
@@ -643,6 +698,8 @@ function updateTraps(g, dt) {
             const p = players[pi];
             if (!p.atDoor && Math.abs(p.x - (t.cx + 0.5)) < 0.85 && p.y >= t.cy && p.y <= t.cy + 1.4) {
               p.vy = Math.max(p.vy, t.boost);
+              p.trapAnim = 'launch';
+              p.trapAnimTimer = 0.65;
               p.onGround = false;
               p.coyote = 0;
             }
@@ -675,6 +732,8 @@ function updateTraps(g, dt) {
               p.vy = 10 * p.gravDir;
               p.stun = 0.32;
               p.slip = 0;
+              p.trapAnim = 'flip';
+              p.trapAnimTimer = 0.6;
               emit(g, 'giftTrap', { x: t.cx + 0.5, y: t.cy + 0.5 });
               break;
             }
@@ -786,10 +845,10 @@ function updateTraps(g, dt) {
         }
         break;
       case 'gateA':
-        t.open = g.channelA;
+        t.open = g.channelA || g.syncActive;
         break;
       case 'gateB':
-        t.open = g.channelB;
+        t.open = g.channelB || g.syncActive;
         break;
       case 'bomb': {
         if (t.defused) { t.state = 'defused'; t.defusing = false; break; }
@@ -834,6 +893,111 @@ function updateTraps(g, dt) {
           } else {
             t.defusing = false;
             t.defuse = Math.max(0, t.defuse - dt * 0.25);
+          }
+        }
+        break;
+      }
+      case 'springTrap': {
+        const pinned = g.hasPlateA && g.coop && g.channelA;
+        if (t.state === 'idle' && !pinned) {
+          for (let pi = 0; pi < players.length; pi++) {
+            if (standingOn(players[pi], t.cx, t.cy)) {
+              t.state = 'shaking';
+              t.timer = t.delay;
+              break;
+            }
+          }
+        } else if (t.state === 'shaking' && (t.timer -= dt) <= 0) {
+          t.state = 'sprung';
+          t.timer = t.cooldown;
+          t.offsetY = 0.55;
+          emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 });
+          for (let pi = 0; pi < players.length; pi++) {
+            const p = players[pi];
+            if (!p.atDoor && Math.abs(p.x - (t.cx + 0.5)) < 0.85 && p.y >= t.cy && p.y <= t.cy + 1.45) {
+              p.vy = t.boost * p.gravDir;
+              p.onGround = false;
+              p.coyote = 0;
+              p.trapAnim = 'boing';
+              p.trapAnimTimer = 0.75;
+            }
+          }
+        } else if (t.state === 'sprung') {
+          t.offsetY = Math.max(0, t.offsetY - dt * 1.4);
+          if ((t.timer -= dt) <= 0) {
+            t.state = 'idle';
+            t.offsetY = 0;
+          }
+        }
+        break;
+      }
+      case 'magnetOrb': {
+        const ox = t.cx + 0.5;
+        const oy = t.cy + 0.5;
+        for (let pi = 0; pi < players.length; pi++) {
+          const p = players[pi];
+          if (p.atDoor) continue;
+          const dx = ox - p.x;
+          const dist = Math.abs(dx);
+          if (dist > 0.15 && dist < t.radius && Math.abs(p.y - t.cy) < 3.6) {
+            const rawDir = Math.sign(dx);
+            const pullDir = (g.coop && g.channelB) ? -rawDir : rawDir;
+            const strength = 1 - dist / t.radius;
+            p.beltVx += pullDir * (2.2 + 3.4 * strength);
+            p.magnetPull = pullDir * Math.max(0.25, strength);
+          }
+        }
+        break;
+      }
+      case 'pieCannon': {
+        const ox = t.cx + 0.5;
+        if (t.state === 'idle') {
+          for (let pi = 0; pi < players.length; pi++) {
+            const p = players[pi];
+            const ahead = (p.x - ox) * t.dir;
+            if (!p.atDoor && ahead > 0.4 && ahead < t.range && Math.abs(p.y - t.cy) < 1.6) {
+              t.state = 'flying';
+              t.x = ox + t.dir * 0.45;
+              t.y = t.cy + 0.48;
+              break;
+            }
+          }
+        } else if (t.state === 'flying') {
+          t.x += t.dir * t.speed * dt;
+          let hit = false;
+          for (let pi = 0; pi < players.length; pi++) {
+            const p = players[pi];
+            if (!p.atDoor && overlaps(p, t.x - 0.3, t.y - 0.3, t.x + 0.3, t.y + 0.3)) {
+              p.pieTimer = 1.4;
+              p.vx = t.dir * 9.5;
+              p.stun = 0.28;
+              p.trapAnim = 'pie';
+              p.trapAnimTimer = 1.4;
+              emit(g, 'trap', { kind: t.kind, x: t.x, y: t.y });
+              hit = true;
+              break;
+            }
+          }
+          if (hit || isSolid(g, Math.floor(t.x), Math.floor(t.y)) || Math.abs(t.x - ox) > t.range + 2) {
+            t.state = 'cooldown';
+            t.timer = t.cooldown;
+          }
+        } else if (t.state === 'cooldown' && (t.timer -= dt) <= 0) {
+          t.state = 'idle';
+        }
+        break;
+      }
+      case 'discoFloor': {
+        if (!(g.coop && g.channelB)) {
+          for (let pi = 0; pi < players.length; pi++) {
+            const p = players[pi];
+            if (standingOn(p, t.cx, t.cy) && p.danceTimer <= 0.15) {
+              p.danceTimer = t.duration;
+              p.trapAnim = 'disco';
+              p.trapAnimTimer = t.duration;
+              t.active = true;
+              emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 });
+            }
           }
         }
         break;
@@ -894,6 +1058,8 @@ export function exportCoopSnapshot(g) {
     keysLeft: g.keysLeft,
     channelA: g.channelA,
     channelB: g.channelB,
+    syncActive: g.syncActive,
+    syncLatch: g.syncLatch,
     dead: g.dead,
     deadTimer: g.deadTimer,
     deathCause: g.deathCause,
@@ -906,6 +1072,8 @@ export function exportCoopSnapshot(g) {
       x: p.x, y: p.y, vx: p.vx, vy: p.vy, face: p.face, gravDir: p.gravDir,
       onGround: p.onGround, stun: p.stun, slip: p.slip, slipDir: p.slipDir,
       flipped: p.flipped, atDoor: p.atDoor,
+      pieTimer: p.pieTimer, danceTimer: p.danceTimer, magnetPull: p.magnetPull,
+      trapAnim: p.trapAnim, trapAnimTimer: p.trapAnimTimer,
     })),
     traps: g.traps.map((t) => ({
       state: t.state, offsetY: t.offsetY, x: t.x, y: t.y, ext: t.ext, vx: t.vx,
@@ -930,6 +1098,8 @@ export function applyCoopSnapshot(g, snap) {
   if (snap.keysLeft !== undefined) g.keysLeft = snap.keysLeft;
   if (snap.channelA !== undefined) g.channelA = snap.channelA;
   if (snap.channelB !== undefined) g.channelB = snap.channelB;
+  if (snap.syncActive !== undefined) g.syncActive = snap.syncActive;
+  if (snap.syncLatch !== undefined) g.syncLatch = snap.syncLatch;
   g.dead = snap.dead;
   g.deadTimer = snap.deadTimer;
   g.deathCause = snap.deathCause;

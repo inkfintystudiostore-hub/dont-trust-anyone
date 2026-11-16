@@ -13,7 +13,9 @@ function play(levelIndex, plan) {
     for (let f = 0; ; f++) {
       if (f > 60 * 20) throw new Error(`step timed out at x=${g.player.x.toFixed(2)}`);
       const p = g.player;
-      const jump = !jumped && p.onGround && !!s.jumpAt?.(p, g);
+      const jump = s.holdJump
+        ? !!s.jumpAt?.(p, g)
+        : !jumped && p.onGround && !!s.jumpAt?.(p, g);
       if (jump) jumped = true;
       const ev = step(g, { left: s.dir < 0, right: s.dir > 0, jump }, DT);
       const death = ev.find((e) => e.type === 'death');
@@ -286,9 +288,10 @@ describe('every level is beatable', () => {
     expect(g.deaths).toBe(0);
   });
 
-  it('L13: hop entry spikes, jump over boxing glove to door', () => {
+  it('L13: hop entry spikes, jump spring trap, jump over boxing glove to door', () => {
     const g = play(12, [
-      { dir: 1, jumpAt: (p) => p.x >= 5.2, until: landedPast(9.5) },
+      { dir: 1, jumpAt: (p) => p.x >= 5.2, until: landedPast(9.4) },
+      { dir: 1, jumpAt: (p) => p.x >= 9.6, until: landedPast(13.8) },
       { dir: 1, jumpAt: (p) => p.x >= 13.8, until: won },
     ]);
     expect(g.deaths).toBe(0);
@@ -327,35 +330,35 @@ describe('every level is beatable', () => {
     expect(g.deaths).toBe(0);
   });
 
-  it('L18: bait both sneeze clouds, jump spikes during cooldown', () => {
+  it('L18: bait both sneeze clouds, jump spikes & pie during cooldown', () => {
     const g = play(17, [
-      { dir: 1, until: (p) => p.x >= 9.0 },
-      { dir: -1, until: (p) => p.x <= 7.8 },
+      { dir: 1, until: (p) => p.x >= 9.05 },
+      { dir: -1, until: (p) => p.x <= 8.0 },
       { dir: 0, until: (_, __, ___, f) => f >= 35 },
-      { dir: 1, jumpAt: (p) => p.x >= 12.0, until: landedPast(16.2) },
-      { dir: 1, until: (p) => p.x >= 19.0 },
-      { dir: -1, until: (p) => p.x <= 17.8 },
-      { dir: 0, until: (_, __, ___, f) => f >= 35 },
-      { dir: 1, until: won },
+      { dir: 1, holdJump: true, jumpAt: (p) => p.x >= 13.2 && p.x <= 15.8, until: landedPast(16.8) },
+      { dir: 1, until: (p) => p.x >= 19.05 },
+      { dir: -1, until: (p) => p.x <= 18.6 },
+      { dir: 0, until: (_, __, ___, f) => f >= 10 },
+      { dir: 1, holdJump: true, jumpAt: (p, gg) => { const pie = gg.traps.find((t) => t.kind === 'pieCannon'); return pie && pie.state === 'flying' && pie.x - p.x < 2.2 && pie.x > p.x - 0.3; }, until: won },
     ]);
     expect(g.deaths).toBe(0);
   });
 
-  it('L19: ignore fake checkpoint, jump fake door, jump boulder to exit', () => {
+  it('L19: ignore fake checkpoint, jump fake door against magnet, jump boulder to exit', () => {
     const g = play(18, [
-      { dir: 1, jumpAt: (p) => p.x >= 15.8, until: landedPast(19.8) },
-      { dir: 1, jumpAt: (p, gg) => { const b = gg.traps.find((t) => t.kind === 'boulder'); return b && b.state === 'rolling' && b.x - p.x < 2.2; }, until: won },
+      { dir: 1, jumpAt: (p) => p.x >= 15.3, until: landedPast(18.8) },
+      { dir: 1, jumpAt: (p, gg) => { const b = gg.traps.find((t) => t.kind === 'boulder'); return b && b.state === 'rolling' && b.x - p.x < 3.0; }, until: won },
     ]);
     expect(g.deaths).toBe(0);
   });
 
-  it('L20: defeat Toy Master 4-stop door across conveyors, crusher, flip-glove, boulder', () => {
+  it('L20: defeat Toy Master 4-stop door across conveyors, crusher, spring, flip-glove, boulder', () => {
     const g = play(19, [
       { dir: 1, until: (_, gg) => gg.door.stopIndex >= 1 },
       { dir: 1, jumpAt: (p) => p.x >= 11.4, until: (_, gg) => gg.door.stopIndex >= 2 },
       { dir: 1, until: (p) => p.x >= 17.6 },
       { dir: 0, until: (_, __, ___, f) => f >= 55 },
-      { dir: 1, jumpAt: (p) => p.x >= 20.4, until: (_, gg) => gg.door.stopIndex >= 3 },
+      { dir: 1, jumpAt: (p) => p.x >= 21.4, until: (_, gg) => gg.door.stopIndex >= 3 },
       { dir: 1, until: (p) => p.flipped > 0 },
       { dir: -1, jumpAt: (p) => p.x >= 28.4, until: (_, gg) => gg.door.stopIndex >= 4 },
       { dir: -1, jumpAt: (p) => p.x >= 38.4, until: won },
@@ -374,11 +377,13 @@ describe('every level is beatable', () => {
     expect(g.deaths).toBe(0);
   });
 
-  it('L22: bait crusher over caramel then jump final pit from solid edge', () => {
+  it('L22: bait crusher over caramel, hop pie, then jump final pit from solid edge', () => {
     const g = play(21, [
       { dir: 1, until: (p) => p.x >= 8.7 },
       { dir: 0, until: (_, __, ___, f) => f >= 55 },
-      { dir: 1, jumpAt: (p) => p.x >= 19.2, until: won },
+      { dir: 1, jumpAt: (p, gg) => { const pie = gg.traps.find((t) => t.kind === 'pieCannon'); return pie && pie.state === 'flying' && pie.x - p.x < 2.0 && pie.x > p.x; }, until: (p) => p.x >= 18.8 },
+      { dir: 1, jumpAt: (p) => p.x >= 19.2, until: (p, gg) => gg.finished || p.x >= 26.5 },
+      { dir: -1, until: won },
     ]);
     expect(g.deaths).toBe(0);
   });
@@ -484,10 +489,11 @@ describe('every level is beatable', () => {
     expect(g.deaths).toBe(0);
   });
 
-  it('L33: wake mirror toy robot then walk left so it marches itself into the pit', () => {
+  it('L33: wake mirror toy robot, dump it in pit, jump spring trap & pie to exit', () => {
     const g = play(32, [
-      { dir: 1, until: (p) => p.x >= 7.5 },
+      { dir: 1, until: (p) => p.x >= 6.0 },
       { dir: -1, until: (_, gg) => gg.traps.find((t) => t.kind === 'mimicRobot').state === 'done' },
+      { dir: 1, jumpAt: (p) => p.x >= 6.8, until: landedPast(9.8) },
       { dir: 1, jumpAt: (p) => p.x >= 17.0, until: won },
     ]);
     expect(g.deaths).toBe(0);
@@ -503,14 +509,15 @@ describe('every level is beatable', () => {
     expect(g.deaths).toBe(0);
   });
 
-  it('L35: Mind Games finale — clear launch floor and gift, walk anti-jump, dump mirror robot', () => {
+  it('L35: Mind Games finale — clear launch floor, gift, spring trap, walk anti-jump, dump mirror robot', () => {
     const g = play(34, [
       { dir: 1, jumpAt: (p) => p.x >= 5.5, until: landedPast(10.0) },
       { dir: 1, jumpAt: (p) => p.x >= 10.6, until: landedPast(15.0) },
       { dir: 1, until: (p) => p.x >= 18.0 },
       { dir: -1, until: (_, gg) => gg.traps.find((t) => t.kind === 'mimicRobot').x >= 29.4 },
       { dir: 0, until: (_, gg) => gg.traps.find((t) => t.kind === 'mimicRobot').state === 'done' },
-      { dir: 1, jumpAt: (p) => p.x >= 28.0, until: won },
+      { dir: 1, jumpAt: (p) => p.x >= 24.0, until: landedPast(26.5) },
+      { dir: 1, jumpAt: (p) => p.x >= 28.6, until: won },
     ]);
     expect(g.deaths).toBe(0);
   });

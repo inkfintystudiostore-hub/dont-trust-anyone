@@ -499,3 +499,63 @@ describe('traps', () => {
     expect(q.shy).toBe(false);
   });
 });
+
+describe('new unexpected funny traps (!, %, $, ~)', () => {
+  it('springTrap (!) launches player skyward after windup and resets after cooldown', () => {
+    const g = createGame([lvl([
+      '.............',
+      '....^........',
+      '.............',
+      '.............',
+      'P............',
+      '####!########',
+    ])]);
+    const ev = run(g, RIGHT, 90);
+    const sp = g.traps.find((t) => t.kind === 'springTrap');
+    expect(ev.some((e) => e.type === 'trap' && e.kind === 'springTrap')).toBe(true);
+    expect(ev.some((e) => e.type === 'death' && e.cause === 'spikes')).toBe(true);
+    run(g, NONE, 70); // after respawn & cooldown
+    expect(sp.state).toBe('idle');
+  });
+
+  it('magnetOrb (%) pulls nearby player sideways and exposes magnetPull for character animation', () => {
+    const g = createGame([lvl([
+      '.............',
+      '.......%.....',
+      '.............',
+      'P............',
+      '#############',
+    ])]);
+    run(g, NONE, 20); // outside 4.2 radius at x=0.5 (7.5 - 0.5 = 7)
+    run(g, RIGHT, 34); // enter magnet radius (~4.0)
+    const xStart = g.player.x;
+    run(g, NONE, 6);
+    expect(Math.abs(g.player.magnetPull)).toBeGreaterThan(0.1);
+    run(g, NONE, 18);
+    expect(g.player.x).toBeGreaterThan(xStart + 0.15);
+  });
+
+  it('pieCannon ($) fires cream pie that splats player with pieTimer, knockback, and pie trapAnim', () => {
+    const g = createGame([lvl([
+      '.............',
+      'P......$.....',
+      '#############',
+    ])]);
+    const ev = run(g, RIGHT, 60);
+    expect(ev.some((e) => e.type === 'trap' && e.kind === 'pieCannon')).toBe(true);
+    expect(g.player.pieTimer).toBeGreaterThan(0);
+    expect(g.player.trapAnim).toBe('pie');
+  });
+
+  it('discoFloor (~) forces funky dance bounce (danceTimer & disco trapAnim)', () => {
+    const g = createGame([lvl([
+      '.............',
+      'P............',
+      '##~~#########',
+    ])]);
+    const ev = run(g, RIGHT, 28);
+    expect(ev.some((e) => e.type === 'trap' && e.kind === 'discoFloor')).toBe(true);
+    expect(g.player.danceTimer).toBeGreaterThan(0);
+    expect(g.player.trapAnim).toBe('disco');
+  });
+});
