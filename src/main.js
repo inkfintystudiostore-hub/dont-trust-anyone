@@ -17,8 +17,8 @@ import { createCoopLobby } from './ui/lobby.js';
 import { hud } from './ui/hud.js';
 import { t, applyI18n } from './i18n.js';
 import {
-  isFullscreenSupported, isInFullscreen, requestGameFullscreen,
-  subscribeFullscreenChange, toggleGameFullscreen,
+  exitGameFullscreen, isFullscreenSupported, isInFullscreen,
+  requestGameFullscreen, subscribeFullscreenChange,
 } from './utils/fullscreen.js';
 
 const FIXED = 1 / 60;
@@ -29,9 +29,17 @@ applyI18n();
 let save = loadSave();
 setMuted(save.muted);
 hud.muteIcon(save.muted);
+let userMinimized = false;
+const ensureDefaultFullscreen = () => {
+  if (!userMinimized && !isInFullscreen()) requestGameFullscreen();
+};
 hud.fullscreenIcon(isInFullscreen());
 if (!isFullscreenSupported()) hud.hideFullscreenBtn();
 subscribeFullscreenChange((fs) => hud.fullscreenIcon(fs));
+addEventListener('pointerdown', (e) => {
+  if (e.target.closest?.('#btn-fullscreen')) return;
+  ensureDefaultFullscreen();
+}, { capture: true, passive: true });
 
 const canvas = $('game');
 const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -56,7 +64,7 @@ function resize() {
   renderer.setSize(innerWidth, innerHeight, false);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
-  hud.portraitHint(innerWidth < innerHeight && innerWidth < 760);
+  hud.portraitHint(false);
 }
 addEventListener('resize', resize);
 resize();
@@ -104,7 +112,7 @@ let mapOpen = false;
 let mapWorld = (LEVELS[game.levelIndex]?.world ?? 1) - 1;
 let mapSelected = game.levelIndex;
 let coopRole = null; // null | 'host' | 'guest'
-let coopStartIdx = 35;
+let coopUnlocked = 0;
 let prevGuestJump = false;
 let guestJumpPending = false;
 let lastHudDeaths = -1;
@@ -125,17 +133,18 @@ const camLook = new Vector3();
 const lobby = createCoopLobby(LEVELS, {
   onMatchStart(levelIndex, snap) {
     coopRole = snap?.isHost ? 'host' : 'guest';
-    coopStartIdx = LEVELS[levelIndex]?.coopOnly ? 35 : 0;
+    const startIdx = Number.isFinite(Number(snap?.levelIndex)) ? snap.levelIndex : levelIndex;
+    coopUnlocked = Math.max(startIdx, Number(snap?.maxLevelIndex ?? startIdx));
     guestInput.left = guestInput.right = guestInput.down = guestInput.jump = false;
     guestInput.moveX = 0;
     prevGuestJump = false;
     guestJumpPending = false;
     lastHudDeaths = -1;
-    game = createGame(LEVELS, levelIndex, { coop: true });
+    game = createGame(LEVELS, startIdx, { coop: true });
     window.__game = game;
     mimi.group.visible = true;
     mimi.reset();
-    startAt(levelIndex, true);
+    startAt(startIdx, true);
     if (coopRole === 'host') {
       lobby.session.sendState(exportCoopSnapshot(game));
     }
@@ -275,7 +284,9 @@ function renderMapGrid(focusSelected = false) {
     btn.className = 'lvl-btn';
     if (i === mapSelected) { btn.classList.add('on'); focusTarget = btn; }
     if (save.bestDeaths[i] !== undefined) btn.classList.add('done');
-    const locked = !coopRole && i < 30 && i > save.unlocked;
+    const locked = coopRole
+      ? i > coopUnlocked
+      : (Boolean(LEVELS[i]?.coopOnly) || (i < 30 && i > save.unlocked));
     btn.disabled = locked;
 
     const top = document.createElement('span');
@@ -283,8 +294,8 @@ function renderMapGrid(focusSelected = false) {
     else top.textContent = String(i + 1);
     const sub = document.createElement('small');
     const best = save.bestDeaths[i];
-    if (best !== undefined) sub.innerHTML = `${ICO_CHECK} ${best}`;
-    else sub.textContent = locked ? '—' : (LEVELS[i]?.coopOnly ? '2P' : 'New');
+    if (best !== undefined && !locked) sub.innerHTML = `${ICO_CHECK} ${best}`;
+    else sub.textContent = locked ? (LEVELS[i]?.coopOnly && !coopRole ? '2P' : 'Locked') : 'New';
     btn.append(top, sub);
 
     btn.addEventListener('click', () => {
@@ -294,9 +305,14 @@ function renderMapGrid(focusSelected = false) {
     grid.appendChild(btn);
   }
   const sel = LEVELS[mapSelected];
-  $('map-selected-title').textContent = sel ? `Level ${mapSelected + 1}: ${t(sel.name)}` : '';
-  $('map-play').disabled = !coopRole && mapSelected < 30 && mapSelected > save.unlocked;
-  diorama.sync(save, mapSelected, Boolean(coopRole));
+  const selLocked = coopRole
+    ? mapSelected > coopUnlocked
+    : (Boolean(sel?.coopOnly) || (mapSelected < 30 && mapSelected > save.unlocked));
+  $('map-selected-title').textContent = sel
+    ? (selLocked && sel.coopOnly && !coopRole ? `Level ${mapSelected + 1}: ${t('map.lockedCoop')}` : `Level ${mapSelected + 1}: ${t(sel.name)}`)
+    : '';
+  $('map-play').disabled = selLocked;
+  diorama.sync(save, mapSelected, Boolean(coopRole), coopUnlocked);
   if (focusSelected && focusTarget) focusTarget.focus();
 }
 
@@ -316,6 +332,7 @@ function leaveCoopToMenu() {
   if (coopRole) {
     lobby.session.leave();
     coopRole = null;
+    coopUnlocked = 0;
   }
   game = createGame(LEVELS, startLevel);
   window.__game = game;
@@ -375,11 +392,12 @@ function closeMap(shouldRebuild = true) {
 }
 
 $('play').addEventListener('click', () => {
-  requestGameFullscreen();
+  ensureDefaultFullscreen();
   const resetFromCoop = Boolean(coopRole);
   if (coopRole) {
     lobby.session.leave();
     coopRole = null;
+    coopUnlocked = 0;
     game = createGame(LEVELS, startLevel);
     window.__game = game;
     mimi.group.visible = false;
@@ -388,21 +406,22 @@ $('play').addEventListener('click', () => {
 });
 $('open-coop').addEventListener('click', () => {
   initAudio();
-  requestGameFullscreen();
+  ensureDefaultFullscreen();
   $('menu').hidden = true;
-  lobby.openCreate(game.level.coopOnly ? game.levelIndex : undefined);
+  lobby.openCreate();
 });
 $('open-map').addEventListener('click', openMap);
 $('end-map').addEventListener('click', openMap);
 $('btn-map').addEventListener('click', openMap);
 $('btn-leave').addEventListener('click', leaveCoopToMenu);
 $('end-leave').addEventListener('click', leaveCoopToMenu);
-$('coop-start').addEventListener('click', () => { initAudio(); requestGameFullscreen(); });
-$('coop-join-btn').addEventListener('click', () => { initAudio(); requestGameFullscreen(); });
+$('coop-start').addEventListener('click', () => { initAudio(); ensureDefaultFullscreen(); });
+$('coop-join-btn').addEventListener('click', () => { initAudio(); ensureDefaultFullscreen(); });
 $('map-close').addEventListener('click', () => {
   if (coopRole) {
     lobby.session.leave();
     coopRole = null;
+    coopUnlocked = 0;
     game = createGame(LEVELS, startLevel);
     window.__game = game;
     mimi.group.visible = false;
@@ -412,13 +431,12 @@ $('map-close').addEventListener('click', () => {
   $('play').focus();
 });
 $('map-play').addEventListener('click', () => {
-  requestGameFullscreen();
-  if (!coopRole && LEVELS[mapSelected]?.coopOnly) {
-    closeMap(false);
-    lobby.openCreate(mapSelected);
+  ensureDefaultFullscreen();
+  if (!coopRole && (LEVELS[mapSelected]?.coopOnly || (mapSelected < 30 && mapSelected > save.unlocked))) {
     return;
   }
   if (coopRole === 'host') {
+    if (mapSelected > coopUnlocked) return;
     lobby.session.setLevel(mapSelected);
     startAt(mapSelected);
     lobby.session.sendEvent({ type: 'levelSync', nextLevel: mapSelected });
@@ -454,7 +472,15 @@ function handleRestart(fromRemote = false) {
   }
 }
 $('btn-restart').addEventListener('click', handleRestart);
-$('btn-fullscreen').addEventListener('click', () => { toggleGameFullscreen(); });
+$('btn-fullscreen').addEventListener('click', () => {
+  if (isInFullscreen()) {
+    userMinimized = true;
+    exitGameFullscreen();
+  } else {
+    userMinimized = false;
+    requestGameFullscreen();
+  }
+});
 $('btn-mute').addEventListener('click', () => {
   save = { ...save, muted: !save.muted };
   if (!save.muted) initAudio();
@@ -477,12 +503,12 @@ addEventListener('keydown', (e) => {
 });
 
 $('again').addEventListener('click', () => {
-  requestGameFullscreen();
+  ensureDefaultFullscreen();
   clearActionTimers();
   resetEffects();
   if (coopRole === 'host') {
-    lobby.session.setLevel(coopStartIdx);
-    lobby.session.startMatch(coopStartIdx);
+    coopUnlocked = 0;
+    lobby.session.startMatch(0);
     return;
   }
   if (coopRole === 'guest') return;
@@ -626,6 +652,9 @@ function onEvent(e) {
       hud.doorWait(false);
       sfx.win();
       const clearedLevel = e.level;
+      if (game.coop && !game.finished) {
+        coopUnlocked = Math.max(coopUnlocked, game.levelIndex);
+      }
       if (!game.coop) {
         const prevUnlocked = save.unlocked;
         save = recordWin(save, clearedLevel, e.deaths, LEVELS.length);

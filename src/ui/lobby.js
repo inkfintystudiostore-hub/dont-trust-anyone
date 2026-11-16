@@ -1,6 +1,6 @@
 /**
  * Co-op Room Lobby UI controller: manages Create/Join tabs, 9-digit invite links,
- * level selection, live 2-seat roster, and WebSocket lifecycle.
+ * live 2-seat roster, and WebSocket lifecycle. Co-op runs always begin at Level 1.
  */
 import { buildRoomShareUrl, formatRoomCode, parseRoomCodeInput } from '../net/roomCode.js';
 import { createCoopSession, loadCoopName, reserveCoopRoom, saveCoopName } from '../net/coopClient.js';
@@ -8,21 +8,12 @@ import { t } from '../i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
-export function createCoopLobby(levels, callbacks) {
+export function createCoopLobby(_levels, callbacks) {
   let tab = 'create';
   let currentCode = null;
   let latestSnapshot = null;
   let copyTimer = 0;
   let reserveSeq = 0;
-
-  const selectEl = $('coop-level');
-  selectEl.innerHTML = '';
-  levels.forEach((lvl, idx) => {
-    const opt = document.createElement('option');
-    opt.value = String(idx);
-    opt.textContent = `L${idx + 1}: ${t(lvl.name)}`;
-    selectEl.appendChild(opt);
-  });
 
   $('coop-name').value = loadCoopName();
 
@@ -40,7 +31,6 @@ export function createCoopLobby(levels, callbacks) {
       latestSnapshot = snap;
       currentCode = snap.code;
       $('coop-code').textContent = formatRoomCode(snap.code);
-      selectEl.value = String(snap.levelIndex);
       renderRoster(snap);
       callbacks.onSnapshot?.(snap);
       if (snap.started && !$('coop').hidden) {
@@ -110,8 +100,7 @@ export function createCoopLobby(levels, callbacks) {
     renderRoster(latestSnapshot);
   }
 
-  const defaultCoopIdx = levels.length > 35 ? 35 : 0;
-  async function hostNewRoom(defaultLevelIndex = defaultCoopIdx) {
+  async function hostNewRoom() {
     const reqId = ++reserveSeq;
     if (currentCode || session.isConnected()) session.leave();
     latestSnapshot = null;
@@ -119,8 +108,7 @@ export function createCoopLobby(levels, callbacks) {
     setTab('create');
     $('coop-code').textContent = '…';
     $('coop-status').textContent = 'Reserving 9-digit room…';
-    selectEl.value = String(defaultLevelIndex);
-    const res = await reserveCoopRoom(defaultLevelIndex);
+    const res = await reserveCoopRoom(0);
     if (reqId !== reserveSeq || $('coop').hidden || tab !== 'create') return;
     if (!res.ok) {
       $('coop-code').textContent = '--- --- ---';
@@ -132,7 +120,7 @@ export function createCoopLobby(levels, callbacks) {
     session.connect({
       code: res.code,
       role: 'host',
-      levelIndex: defaultLevelIndex,
+      levelIndex: 0,
       playerName: $('coop-name').value.trim(),
     });
   }
@@ -170,10 +158,7 @@ export function createCoopLobby(levels, callbacks) {
   }
 
   $('coop-tab-create').addEventListener('click', () => {
-    if (tab !== 'create') {
-      const idx = selectEl.value !== '' ? Number(selectEl.value) : defaultCoopIdx;
-      hostNewRoom(Number.isFinite(idx) ? idx : defaultCoopIdx);
-    }
+    if (tab !== 'create') hostNewRoom();
   });
   $('coop-tab-join').addEventListener('click', () => {
     if (tab === 'join') return;
@@ -192,9 +177,6 @@ export function createCoopLobby(levels, callbacks) {
     saveCoopName(name);
     if (session.isConnected()) session.setName(name);
   });
-  selectEl.addEventListener('change', () => {
-    if (session.isConnected()) session.setLevel(Number(selectEl.value));
-  });
   $('coop-copy-code').addEventListener('click', () => {
     if (currentCode) copyText($('coop-copy-code'), formatRoomCode(currentCode), t('coop.copyCode'));
   });
@@ -202,7 +184,7 @@ export function createCoopLobby(levels, callbacks) {
     if (currentCode) copyText($('coop-copy-link'), buildRoomShareUrl(currentCode), t('coop.copyLink'));
   });
   $('coop-join-btn').addEventListener('click', () => joinByCode($('coop-join-input').value));
-  $('coop-start').addEventListener('click', () => session.startMatch(Number(selectEl.value) || 0));
+  $('coop-start').addEventListener('click', () => session.startMatch(0));
   $('coop-close').addEventListener('click', () => {
     $('coop').hidden = true;
     session.leave();
@@ -212,10 +194,10 @@ export function createCoopLobby(levels, callbacks) {
   });
 
   return {
-    openCreate(defaultLevelIndex = defaultCoopIdx) {
+    openCreate() {
       $('coop').hidden = false;
       $('coop-name').focus();
-      hostNewRoom(defaultLevelIndex);
+      hostNewRoom();
     },
     openJoin(prefillCode) {
       $('coop').hidden = false;

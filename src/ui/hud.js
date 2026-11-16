@@ -62,11 +62,15 @@ export const hud = {
   },
   fullscreenIcon(active) {
     const el = $('btn-fullscreen');
-    if (el) {
-      el.innerHTML = active ? ICO_FS_EXIT : ICO_FS_ENTER;
-      el.setAttribute('aria-pressed', String(!!active));
-      el.setAttribute('aria-label', active ? 'Exit Fullscreen' : 'Enter Fullscreen');
-    }
+    if (!el) return;
+    const icoWrap = el.querySelector('.ico-wrap');
+    if (icoWrap) icoWrap.innerHTML = active ? ICO_FS_EXIT : ICO_FS_ENTER;
+    else el.innerHTML = active ? ICO_FS_EXIT : ICO_FS_ENTER;
+    const lbl = el.querySelector('.fs-label');
+    if (lbl) lbl.textContent = active ? 'Minimize' : 'Full';
+    el.setAttribute('aria-pressed', String(!!active));
+    el.setAttribute('aria-label', active ? 'Minimize to Normal Mode' : 'Enter Fullscreen');
+    el.setAttribute('title', active ? 'Minimize to Normal Mode' : 'Fullscreen (Landscape)');
   },
   hideFullscreenBtn() {
     const el = $('btn-fullscreen');

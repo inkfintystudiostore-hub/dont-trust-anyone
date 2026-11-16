@@ -17,10 +17,11 @@ function clampLevelIndex(v) {
   return Math.max(0, Math.min(MAX_LEVEL_INDEX, Math.floor(n)));
 }
 
-export function createRoomRecord(code, levelIndex = 0, now = Date.now()) {
+export function createRoomRecord(code, _levelIndex = 0, now = Date.now()) {
   return {
     code,
-    levelIndex: clampLevelIndex(levelIndex),
+    levelIndex: 0,
+    maxLevelIndex: 0,
     started: false,
     hostId: '',
     lastActiveAt: now,
@@ -146,7 +147,8 @@ export function handleRoomAction(record, playerId, msg, now = Date.now()) {
       if (seatIndex !== 0) {
         return { ...noop, reply: { type: 'error', message: 'Only the Host can change the level.' } };
       }
-      const next = { ...record, levelIndex: clampLevelIndex(msg.levelIndex), lastActiveAt: now };
+      const allowedMax = clampLevelIndex(record.maxLevelIndex ?? 0);
+      const next = { ...record, levelIndex: Math.min(clampLevelIndex(msg.levelIndex), allowedMax), lastActiveAt: now };
       return { record: next, persist: true, broadcastSnapshots: true, relayToOthers: [], broadcast: [] };
     }
     case 'start': {
@@ -157,14 +159,14 @@ export function handleRoomAction(record, playerId, msg, now = Date.now()) {
       if (!bothReady) {
         return { ...noop, reply: { type: 'error', message: 'Waiting for Player 2 (Mimi) to join.' } };
       }
-      const levelIndex = msg.levelIndex !== undefined ? clampLevelIndex(msg.levelIndex) : record.levelIndex;
-      const next = { ...record, levelIndex, started: true, lastActiveAt: now };
+      // Co-op runs always begin together from Level 1 (index 0) and unlock forward together.
+      const next = { ...record, levelIndex: 0, maxLevelIndex: 0, started: true, lastActiveAt: now };
       return {
         record: next,
         persist: true,
         broadcastSnapshots: true,
         relayToOthers: [],
-        broadcast: [{ type: 'started', levelIndex }],
+        broadcast: [{ type: 'started', levelIndex: 0 }],
       };
     }
     case 'input': {
@@ -197,9 +199,12 @@ export function handleRoomAction(record, playerId, msg, now = Date.now()) {
     case 'event': {
       // Only Host (seat 0) broadcasts canonical simulation events (death, win, trap, doorWait, respawn).
       if (seatIndex !== 0 || !record.started || !msg.event) return noop;
-      const next = msg.event?.type === 'win' && Number.isFinite(msg.event.nextLevel)
-        ? { ...record, levelIndex: clampLevelIndex(msg.event.nextLevel), lastActiveAt: now }
-        : record;
+      let next = record;
+      if (msg.event?.type === 'win' && Number.isFinite(msg.event.nextLevel)) {
+        const curMax = record.maxLevelIndex ?? 0;
+        const nextLevel = Math.min(clampLevelIndex(msg.event.nextLevel), Math.min(MAX_LEVEL_INDEX, curMax + 1));
+        next = { ...record, levelIndex: nextLevel, maxLevelIndex: Math.max(curMax, nextLevel), lastActiveAt: now };
+      }
       return {
         record: next,
         persist: next !== record,

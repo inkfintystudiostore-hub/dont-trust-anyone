@@ -555,7 +555,7 @@ Resin-miniature jaisa 3D tabletop diorama (`src/render/diorama.js`) + `src/save.
 5. World 1–3 (`L1–L30`) + World 4 Mind Games (`L31–L35`): poore 35 levels complete + bot-tested ✅
 6. Naye unexpected Mind Games traps (`L` Launch Floor, `A` Anti-Jump, `J` Mystery Gift Box `gift_box.glb`, `E` Mirror Toy Robot `toy_robot.glb`, `Q` Peek-a-Boo Ghost `cute_ghost.glb`) + SVG HUD/map UI polish + fast-fall (`↓`/`S`) + contact drop-shadow + parallax sky shader ✅
 7. Online 2-Player Co-op (`Momo` + `Mimi`) via Cloudflare Worker + Durable Object (`https://dont-trust-anyone.inkfintystudio-store.workers.dev`): shared-fate death restarts BOTH players, BOTH must reach door to clear level, 9-digit room codes + `?room=` invite links, mid-match reconnect support, zero jump-latch drops ✅
-8. World 5 Couple Co-op (`L36–L42`, `coopOnly: true`): Golden Key (`golden_key.glb`), Hold Plates (`H`/`h`, `coop_switch.glb`), Full-height Laser Gates (`=`/`-`), Ticking Bomb Defusal (`ticking_bomb.glb`), always-fullscreen UX + smooth Virtual Analog Joystick + Inkfinity Store Game Room Fullscreen wrapper ✅
+8. World 5 Couple Co-op (`L36–L42`, `coopOnly: true`): Golden Key (`golden_key.glb`), Hold Plates (`H`/`h`, `coop_switch.glb`), Full-height Laser Gates (`=`/`-`), Ticking Bomb Defusal (`ticking_bomb.glb`), always-fullscreen default landscape (`manifest.webmanifest`, `screen.orientation.lock('landscape')`) + Minimize-to-normal toggle + Landscape & Portrait ("front view") support, aur **strict Solo vs Co-op rules**: Solo (`L1–L35`, 2P levels locked) vs 2P Co-op hamesha **Level 1 (`L1`)** se shuru hoke saath `L1 → L42` paar ✅
 
 ✍️ Tumhare notes / naye ideas:
 

@@ -3,6 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.webmanifest">
   <title>Don't Trust Anyone</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='34' r='24' fill='%23fffbf7' stroke='%238b0d1a' stroke-width='5'/><circle cx='24' cy='32' r='4' fill='%231f1916'/><circle cx='40' cy='32' r='4' fill='%231f1916'/></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,7 +28,9 @@
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
       </button>
       <button class="pill btn-pill" id="btn-mute" title="Sound" aria-label="Sound" aria-pressed="false"></button>
-      <button class="pill btn-pill" id="btn-fullscreen" title="Fullscreen" aria-label="Fullscreen" aria-pressed="false"></button>
+      <button class="pill btn-pill" id="btn-fullscreen" title="Fullscreen" aria-label="Fullscreen" aria-pressed="false">
+        <span class="ico-wrap" aria-hidden="true"></span><span class="fs-label">Full</span>
+      </button>
       <button class="pill btn-pill" id="btn-leave" hidden title="Leave Co-op Room" aria-label="Leave Co-op Room">
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
       </button>
@@ -84,8 +90,7 @@
             <button id="coop-copy-link" class="pill btn-pill" type="button" data-i18n="coop.copyLink"></button>
           </div>
         </div>
-        <label class="field-label" for="coop-level" data-i18n="coop.levelLabel"></label>
-        <select id="coop-level" class="field"></select>
+        <div id="coop-start-note" class="coop-start-note" data-i18n="coop.startL1Note"></div>
       </div>
 
       <div id="coop-join-pane" hidden>

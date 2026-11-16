@@ -43,19 +43,30 @@ describe('worker 2-player co-op room state machine', () => {
     expect(rGuestStart.record.started).toBe(false);
     expect(rGuestStart.reply?.type).toBe('error');
 
-    // Host picks World 5 L42 (index 41) and starts -> preserves index 41 (not clamped at 34) + broadcasts snapshots
-    const rLevel = handleRoomAction(room, 'p1', { type: 'set_level', levelIndex: 41 }, 1200);
-    expect(rLevel.record.levelIndex).toBe(41);
-    const rStart = handleRoomAction(rLevel.record, 'p1', { type: 'start', levelIndex: 41 }, 1250);
+    // Co-op rooms ALWAYS start at Level 1 (index 0) and unlock forward level by level together
+    const rSkip = handleRoomAction(room, 'p1', { type: 'set_level', levelIndex: 41 }, 1200);
+    expect(rSkip.record.levelIndex).toBe(0);
+    const rStart = handleRoomAction(rSkip.record, 'p1', { type: 'start', levelIndex: 35 }, 1250);
     expect(rStart.record.started).toBe(true);
+    expect(rStart.record.levelIndex).toBe(0);
+    expect(rStart.record.maxLevelIndex).toBe(0);
     expect(rStart.broadcastSnapshots).toBe(true);
     expect(snapshotForPlayer(rStart.record, 'p1').yourSeat).toBe(0);
     expect(snapshotForPlayer(rStart.record, 'p2').yourSeat).toBe(1);
+
+    // Clearing levels sequentially unlocks forward progress all the way up to L42 (index 41)
+    let progressed = rStart.record;
+    for (let nxt = 1; nxt <= 41; nxt++) {
+      progressed = handleRoomAction(progressed, 'p1', { type: 'event', event: { type: 'win', nextLevel: nxt } }, 1250 + nxt).record;
+    }
+    expect(progressed.maxLevelIndex).toBe(41);
+    const rJump42 = handleRoomAction(progressed, 'p1', { type: 'set_level', levelIndex: 41 }, 1400);
+    expect(rJump42.record.levelIndex).toBe(41);
   });
 
   it('enforces relay authority: only guest relays input (including analog moveX), only host relays state and events', () => {
     let room = createRoomRecord('482910375', 35, 1000);
-    expect(room.levelIndex).toBe(35);
+    expect(room.levelIndex).toBe(0);
     room = joinRoom(room, 'p1', 'P1', 1000, 'dev-1');
     room = joinRoom(room, 'p2', 'P2', 1100, 'dev-2');
     room = handleRoomAction(room, 'p1', { type: 'start', levelIndex: 35 }, 1200).record;
@@ -65,7 +76,7 @@ describe('worker 2-player co-op room state machine', () => {
     expect(spoof.relayToOthers).toHaveLength(0);
 
     // Host sending state -> relayed to Guest
-    const hostState = handleRoomAction(room, 'p1', { type: 'state', state: { levelIndex: 35, dead: true } }, 1350);
+    const hostState = handleRoomAction(room, 'p1', { type: 'state', state: { levelIndex: 0, dead: true } }, 1350);
     expect(hostState.relayToOthers).toHaveLength(1);
     expect(hostState.relayToOthers[0].type).toBe('state');
 

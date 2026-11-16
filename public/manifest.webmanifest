@@ -1,0 +1,9 @@
+{
+  "name": "Don't Trust Anyone — 3D Platformer",
+  "short_name": "Don't Trust",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "start_url": "/",
+  "background_color": "#fffbf7",
+  "theme_color": "#8b0d1a"
+}

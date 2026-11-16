@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { LEVELS } from '../levels.js';
 import { parseLevel } from './level.js';
 import { createGame, step, exportCoopSnapshot, applyCoopSnapshot } from './game.js';
 
@@ -242,5 +243,38 @@ describe('analog moveX + co-op coordination traps', () => {
     expect(respawned).toBe(true);
     expect(guest.players[0].x).toBeCloseTo(host.players[0].x, 4);
     expect(guest.players[0].prevX).toBeCloseTo(host.players[0].x, 4);
+  });
+
+  it('solo stops at L35 (never enters coopOnly L36-L42), while co-op advances from L35 straight into L36-L42 together', () => {
+    // 1. Standalone 2P level lock check in LEVELS metadata
+    expect(LEVELS.slice(0, 35).every((l) => !l.coopOnly)).toBe(true);
+    expect(LEVELS.slice(35).every((l) => l.coopOnly)).toBe(true);
+
+    // 2. Solo win at L35 (index 34) finishes Solo campaign cleanly instead of entering L36
+    const soloGame = createGame(LEVELS, 34, { coop: false });
+    const l35 = soloGame.level;
+    expect(soloGame.levelIndex).toBe(34);
+    soloGame.players[0].x = l35.door.x;
+    soloGame.players[0].y = l35.door.y;
+    const soloWin = step(soloGame, NONE, DT);
+    expect(soloWin.some((e) => e.type === 'win' && e.level === 34)).toBe(true);
+    expect(soloGame.finished).toBe(true);
+    expect(soloGame.levelIndex).toBe(34);
+
+    // 3. Co-op starting at L1 advances cleanly to L2 only when BOTH reach the door,
+    // and Co-op at L35 advances into World 5 L36..L42 when BOTH reach door together
+    const coopL35 = createGame(LEVELS, 34, { coop: true });
+    coopL35.players[0].x = l35.door.x;
+    coopL35.players[0].y = l35.door.y;
+    step(coopL35, [NONE, NONE], DT);
+    expect(coopL35.players[0].atDoor).toBe(true);
+    expect(coopL35.levelIndex).toBe(34); // P2 not at door yet -> cannot clear L35 alone!
+
+    coopL35.players[1].x = l35.door.x;
+    coopL35.players[1].y = l35.door.y;
+    const coopWin = step(coopL35, [NONE, NONE], DT);
+    expect(coopWin.some((e) => e.type === 'win' && e.level === 34)).toBe(true);
+    expect(coopL35.finished).toBe(false);
+    expect(coopL35.levelIndex).toBe(35); // Advances straight into L36 together!
   });
 });
