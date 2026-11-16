@@ -193,6 +193,12 @@ export function createCoopLobby(_levels, callbacks) {
     if (currentCode) copyText($('coop-copy-link'), buildRoomShareUrl(currentCode), t('coop.copyLink'));
   });
   $('coop-join-btn').addEventListener('click', () => joinByCode($('coop-join-input').value));
+  $('coop-join-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      joinByCode($('coop-join-input').value);
+    }
+  });
   $('coop-start').addEventListener('click', () => session.startMatch(0));
   $('coop-close').addEventListener('click', () => {
     $('coop').hidden = true;

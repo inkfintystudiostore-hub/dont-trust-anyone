@@ -37,7 +37,7 @@ hud.fullscreenIcon(isInFullscreen());
 if (!isFullscreenSupported()) hud.hideFullscreenBtn();
 subscribeFullscreenChange((fs) => hud.fullscreenIcon(fs));
 addEventListener('pointerdown', (e) => {
-  if (e.target.closest?.('#btn-fullscreen')) return;
+  if (e.target.closest?.('#btn-fullscreen, input, textarea, select')) return;
   ensureDefaultFullscreen();
 }, { capture: true, passive: true });
 for (const evName of ['gesturestart', 'gesturechange', 'gestureend']) {
@@ -49,7 +49,7 @@ addEventListener('touchmove', (e) => {
 let lastTapAt = 0;
 addEventListener('touchend', (e) => {
   const now = performance.now();
-  if (now - lastTapAt < 300 && !e.target.closest?.('button, a, input')) e.preventDefault();
+  if (now - lastTapAt < 300 && !e.target.closest?.('button, a, input, #coop, #menu, #map')) e.preventDefault();
   lastTapAt = now;
 }, { passive: false });
 

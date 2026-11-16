@@ -18,6 +18,7 @@ body.world-4 { --sky-top: #a89fe6; --sky-bottom: #ffe2ec; }
 body.world-5 { --sky-top: #ffd1dc; --sky-bottom: #fff1f5; }
 
 * { box-sizing: border-box; }
+input, textarea { -webkit-user-select: text; user-select: text; touch-action: auto; }
 html, body {
   margin: 0; width: 100%; height: 100%; height: 100dvh; overflow: hidden;
   background: linear-gradient(180deg, var(--sky-top), var(--sky-bottom) 70%);
