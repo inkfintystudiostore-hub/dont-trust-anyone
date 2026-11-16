@@ -1,0 +1,23 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "cream-palette",
+        "value": "*",
+        "files": [
+          "tools/viewer.html"
+        ],
+        "createdAt": "2026-11-16T04:10:29.071Z",
+        "reason": "Claude decided: #fffbf7 is the --bg brand token read from inkfinitystudio.store's :root CSS, which the game UI must match per GAME_PLAN.md section 7"
+      },
+      {
+        "rule": "overused-font",
+        "value": "plus jakarta sans",
+        "createdAt": "2026-11-16T04:57:26.226Z",
+        "reason": "Claude decided: Plus Jakarta Sans is inkfinitystudio.store's --font-body token (read from its :root CSS); the game UI must match the store per GAME_PLAN.md section 7"
+      }
+    ]
+  }
+}

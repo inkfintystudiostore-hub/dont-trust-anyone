@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asset Viewer</title>
+<style>
+  :root { --bg: #fffbf7; --ink: #1f1916; --crimson: #8b0d1a; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px system-ui, sans-serif; overflow: hidden; }
+  #ui { position: fixed; top: 10px; left: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  select, button { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid #d9c9bb; background: #fff; }
+  #info { font-family: monospace; font-size: 12px; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+               "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="ui"><select id="pick"></select><button id="spin">spin</button><span id="info"></span></div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#fffbf7');
+scene.add(new THREE.HemisphereLight('#ffffff', '#e8d6c6', 2.2));
+const sun = new THREE.DirectionalLight('#ffffff', 2.4); sun.position.set(3, 5, 4); scene.add(sun);
+
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.01, 100);
+camera.position.set(0, 0.6, 3);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.autoRotate = true;
+document.getElementById('spin').onclick = () => (controls.autoRotate = !controls.autoRotate);
+
+const loader = new GLTFLoader();
+let current;
+async function load(file) {
+  if (current) scene.remove(current);
+  const gltf = await loader.loadAsync(`../assets/raw/${file}`);
+  current = gltf.scene;
+  // normalize: 1 unit tall, standing on y=0
+  const box = new THREE.Box3().setFromObject(current);
+  const size = box.getSize(new THREE.Vector3());
+  current.scale.setScalar(1 / size.y);
+  box.setFromObject(current);
+  current.position.sub(box.getCenter(new THREE.Vector3())).add(new THREE.Vector3(0, 0.5, 0));
+  scene.add(current);
+  controls.target.set(0, 0.5, 0);
+  let tris = 0;
+  current.traverse((o) => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
+  document.getElementById('info').textContent = `${file} | ${Math.round(tris)} tris`;
+  window.__viewer = { file, tris: Math.round(tris), size: size.toArray() };
+}
+
+const files = (await (await fetch('../assets/raw/')).text()).match(/[\w-]+\.glb/g) ?? [];
+const pick = document.getElementById('pick');
+for (const f of [...new Set(files)]) pick.add(new Option(f, f));
+pick.onchange = () => load(pick.value);
+const want = new URLSearchParams(location.search).get('f');
+if (files.length) { pick.value = want && files.includes(want) ? want : files[0]; load(pick.value); }
+
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+</script>
+</body>
+</html>

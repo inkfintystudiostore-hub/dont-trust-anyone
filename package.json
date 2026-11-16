@@ -1,0 +1,28 @@
+{
+  "name": "dont-trust-anyone",
+  "version": "1.0.0",
+  "description": "Don't Trust Anyone: 3D rage-bait troll platformer",
+  "scripts": {
+    "dev": "vite",
+    "worker:dev": "wrangler dev --port 8787",
+    "build": "vite build",
+    "deploy": "npm run build && wrangler deploy",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "viewer": "node tools/serve.mjs 5180"
+  },
+  "license": "UNLICENSED",
+  "type": "module",
+  "devDependencies": {
+    "@gltf-transform/cli": "^4.5.1",
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "sharp": "^0.33.5",
+    "vite": "^6.0.7",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "private": true
+}
