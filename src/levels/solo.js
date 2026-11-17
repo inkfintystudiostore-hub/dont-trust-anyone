@@ -4,10 +4,12 @@
 // Text keys: s<N>.name / s<N>.sign / s<N>.t1..t3 in src/levels/soloText.js.
 import { ROOMS } from './rooms.js';
 import { composeLevel } from './compose.js';
+import { parseLevel } from '../core/level.js';
+import { trapCount, trapTarget } from '../core/trapLedger.js';
 
 // [rooms..., debut room is last when the level introduces a trap]; null debut = callback-only level
 const SCHEDULE = [
-  { rooms: ['doorRunHome'], debut: true }, // L1 fallingFloor
+  { rooms: ['pitNear', 'doorRunHome'], debut: true }, // L1 fallingFloor
   { rooms: ['invisGap', 'spikePop'], debut: true }, // L2 invisibleBlock + hiddenSpikes
   { rooms: ['coinRow', 'ghostBridge'], debut: true }, // L3 chompCoin + ghostFloor
   { rooms: ['pitNear', 'icicleHall'], debut: true }, // L4 icicle (pit opens as you approach)
@@ -31,7 +33,7 @@ const SCHEDULE = [
   { rooms: ['crusherWalk', 'fakeExit', 'flipRoom'], debut: true }, // L22 controlsFlip
   { rooms: ['hungryGap', 'conveyorSpike', 'invisGap', 'swellHall'], debut: true }, // L23 sizeSwell
   { rooms: ['boulderRoll', 'sawTunnel', 'bananaSlide', 'launchPad'], debut: true }, // L24 launchFloor
-  { rooms: ['closingHall', 'swapRun'], breather: true }, // L25
+  { rooms: ['coinRow', 'closingHall', 'swapRun'], breather: true }, // L25
   { rooms: ['glovePunch', 'risingTrap', 'chickenSpikes', 'gravRoom'], debut: true }, // L26 gravityFlip
   { rooms: ['ghostBridge', 'cannonHall', 'springCeiling', 'shySteps'], debut: true }, // L27 shyPlatform
   { rooms: ['icicleHall', 'flipRoom', 'crusherWalk', 'fakeFlag'], debut: true }, // L28 fakeCheckpoint
@@ -62,14 +64,30 @@ const LAST = SCHEDULE.length - 1;
 export const SOLO_RAW = SCHEDULE.map(({ rooms, debut, breather }, i) => {
   const n = i + 1;
   const h = i / LAST;
-  return composeLevel({
+  // the debut room teaches at h=0; every callback room is tuned to this level's hardness.
+  // L1-L5 are all debuts: everything at h=0
+  const hOf = (k) => (i < 5 || (debut && k === rooms.length - 1) ? 0 : h);
+  const build = (more) => composeLevel({
     name: `s${n}.name`,
     world: worldOf(i),
     breather: !!breather,
-    // the debut room teaches at h=0; every callback room is tuned to this level's hardness
-    // L1-L5 are all debuts: everything at h=0
-    rooms: rooms.map((r, k) => ({ id: r, ...ROOMS[r]({ h: i < 5 || (debut && k === rooms.length - 1) ? 0 : h }) })),
+    rooms: rooms.map((r, k) => ({ id: r, ...ROOMS[r]({ h: hOf(k), more: more[k] }) })),
     signs: [{ x: 4.5, text: `s${n}.sign` }],
     taunts: [`s${n}.t1`, `s${n}.t2`, `s${n}.t3`],
   });
+  return fillTraps(build, rooms.map((r) => ROOMS[r]().maxMore ?? 0), trapTarget(i, SCHEDULE.length));
 });
+
+/** Switches on room extras one at a time (fewest-used room first) until the level has `target` traps. */
+export function fillTraps(build, maxMore, target) {
+  const more = maxMore.map(() => 0);
+  let raw = build(more);
+  while (trapCount(parseLevel(raw)) < target) {
+    let pick = -1;
+    for (let k = 0; k < more.length; k++) if (more[k] < maxMore[k] && (pick < 0 || more[k] < more[pick])) pick = k;
+    if (pick < 0) break; // no extras left: the trap-count test reports it
+    more[pick]++;
+    raw = build(more);
+  }
+  return raw;
+}

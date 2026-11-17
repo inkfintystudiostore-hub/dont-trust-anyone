@@ -10,7 +10,6 @@ export const IGNORED_KINDS = new Set(['runningDoor']); // door behaviour, not a 
 
 // Parameter direction that makes a trap harder: -1 = smaller is harder, +1 = bigger is harder.
 export const HARDER = {
-  fallingFloor: { delay: -1 },
   hiddenSpikes: { delay: -1, radius: 1 },
   crusher: { delay: -1, slamSpeed: 1 },
   boulder: { speed: 1 },
@@ -25,6 +24,33 @@ export const HARDER = {
   bomb: { fuse: -1 },
   weightBridge: { delay: -1 },
 };
+
+/**
+ * Traps as a player counts them: touching cells of one kind are one trap (a conveyor strip, a fake
+ * bridge), and a door that runs away counts as one.
+ * @example trapCount(parseLevel({ name: 'x', rows: ['P.S.CC.D', '########'] })) // 2
+ */
+export function trapCount(level) {
+  const defs = level.trapDefs.filter((t) => t.kind !== 'runningDoor');
+  let n = level.trapDefs.length > defs.length ? 1 : 0;
+  const seen = new Set();
+  for (const t of defs) {
+    if (seen.has(t)) continue;
+    n++;
+    seen.add(t);
+    const stack = [t];
+    while (stack.length) {
+      const a = stack.pop();
+      for (const b of defs) {
+        if (!seen.has(b) && b.kind === a.kind && Math.abs(b.cx - a.cx) <= 1 && Math.abs(b.cy - a.cy) <= 1) { seen.add(b); stack.push(b); }
+      }
+    }
+  }
+  return n;
+}
+
+/** Trap target for level i of n: 5 on the first level rising to 12 on the last (user request 17 Nov). */
+export const trapTarget = (i, n) => 5 + Math.round((7 * i) / Math.max(1, n - 1));
 
 /** Map kind -> { debut, levels } over a level list (indices into that list). */
 export function trapLedger(levels) {

@@ -3,9 +3,26 @@
 // 's' = start, 'e' = exit/door (see compose.js). Options make callbacks harder than the debut.
 // `final: true` rooms only work as the last room (their trick is the door itself).
 
-const R = (rows, traps = [], extra = {}) => ({ rows, traps, ...extra });
 // o.h: 0 at a trap's debut, rising to 1 by the finale; params only ever get harder with h.
 const L = (a, b, o) => +(a + (b - a) * Math.max(0, Math.min(1, o.h ?? 0))).toFixed(3);
+// o.more: how many of the room's optional extra traps to switch on (solo.js fills levels to 5-12 traps).
+// An extra group = cells [x, row, ch] (row: 'w' walking row, 'f' floor top, 'b' bottom, or an index)
+// plus configs; a config with `x` applies only to that column of the room.
+const R = (rows, traps = [], extra = {}, groups = [], o = {}) => {
+  const grid = rows.map((r) => r.split(''));
+  const rowOf = (r) => (r === 'w' ? rows.length - 3 : r === 'f' ? rows.length - 2 : r === 'b' ? rows.length - 1 : r);
+  const used = groups.slice(0, o.more ?? 0);
+  for (const gr of used) for (const [x, r, ch] of gr.cells) grid[rowOf(r)][x] = ch;
+  return { rows: grid.map((r) => r.join('')), traps: [...used.flatMap((gr) => gr.traps ?? []), ...traps], maxMore: groups.length, ...extra };
+};
+// extra building blocks, all from traps that debut early (pits L1, hidden spikes L2, coins L3)
+const xS = (x, o) => ({ cells: [[x, 'w', 'S']], traps: [{ at: 'S', x, delay: L(0.12, 0.08, o), radius: L(1.6, 1.9, o) }] });
+const xC = (x, r = 'w') => ({ cells: [[x, r, 'C']] });
+const xPit = (x, o) => ({
+  cells: [[x, 'f', 'F'], [x + 1, 'f', 'F'], [x, 'b', '.'], [x + 1, 'b', '.']],
+  traps: [x, x + 1].map((cx) => ({ at: 'F', x: cx, near: L(2.2, 2.6, o), delay: L(0.05, 0.02, o) })),
+});
+const cell = (x, r, ch, traps = []) => ({ cells: [[x, r, ch]], traps });
 
 export const ROOMS = {
   // --- fallingFloor: Level Devil opening, the pit opens as you approach ---
@@ -17,7 +34,7 @@ export const ROOMS = {
     's.....................e.',
     '################FF######',
     '################..######',
-  ], [{ at: 'F', near: L(2.2, 2.6, o), delay: L(0.05, 0.02, o) }]),
+  ], [{ at: 'F', near: L(2.2, 2.6, o), delay: L(0.05, 0.02, o) }], {}, [xPit(8, o), xPit(4, o)], o),
 
   pitTwice: (o = {}) => R([
     '............................',
@@ -27,10 +44,10 @@ export const ROOMS = {
     's.........................e.',
     '#########FF########FFF######',
     '#########..########...######',
-  ], [{ at: 'F', near: L(2.4, 2.8, o), delay: L(0.04, 0.02, o) }]),
+  ], [{ at: 'F', near: L(2.4, 2.8, o), delay: L(0.04, 0.02, o) }], {}, [xS(4, o), xC(15)], o),
 
-  // L1 finale: door runs home across the pit you made
-  doorRunHome: () => R([
+  // L1 finale: door runs home across the pits you made
+  doorRunHome: (o = {}) => R([
     '..........................',
     '..........................',
     '..........................',
@@ -38,7 +55,7 @@ export const ROOMS = {
     's.T...................e...',
     '##########F###...#########',
     '##########.###...#########',
-  ], [{ at: 'D', runTo: 'T', radius: 2.2 }], { final: true }),
+  ], [{ at: 'D', runTo: 'T', radius: 2.2 }], { final: true }, [xPit(5, o)], o),
 
   // --- hiddenSpikes ---
   spikePop: (o = {}) => R([
@@ -49,10 +66,10 @@ export const ROOMS = {
     's.........S.......S...e.',
     '########################',
     '########################',
-  ], [{ at: 'S', delay: L(0.12, 0.08, o), radius: L(1.6, 1.9, o) }]),
+  ], [{ at: 'S', delay: L(0.12, 0.08, o), radius: L(1.6, 1.9, o) }], {}, [xS(5, o), xS(14, o)], o),
 
   // --- invisibleBlock (bonks a normal jump into the gap) ---
-  invisGap: () => R([
+  invisGap: (o = {}) => R([
     '..........................',
     '..........................',
     '........I.................',
@@ -61,7 +78,10 @@ export const ROOMS = {
     's.....................e...',
     '######..##################',
     '######..##################',
-  ]),
+  ], [], {}, [
+    { cells: [[15, 'f', '.'], [16, 'f', '.'], [15, 'b', '.'], [16, 'b', '.'], [17, 2, 'I']] },
+    xS(11, o),
+  ], o),
 
   // --- ghostFloor: the bridge is fake, the high road is real ---
   ghostBridge: (o = {}) => R([
@@ -72,10 +92,10 @@ export const ROOMS = {
     's.......................S..e..',
     '######GGGGGG##################',
     '######......##################',
-  ], [{ at: 'S', delay: L(0.12, 0.08, o), radius: 1.6 }]),
+  ], [{ at: 'S', delay: L(0.12, 0.08, o), radius: 1.6 }], {}, [xS(20, o), xC(16, 2)], o),
 
   // --- chompCoin: the dot row from the trailer bites ---
-  coinRow: () => R([
+  coinRow: (o = {}) => R([
     '..........................',
     '..........................',
     '..........................',
@@ -83,9 +103,9 @@ export const ROOMS = {
     's.....C...C...C.......e...',
     '##########################',
     '##########################',
-  ]),
+  ], [], {}, [xC(18), xS(21, o)], o),
 
-  coinBait: () => R([
+  coinBait: (o = {}) => R([
     '............................',
     '............................',
     '.............C..............',
@@ -93,7 +113,7 @@ export const ROOMS = {
     's.....C............C....e...',
     '#############F##############',
     '############################',
-  ]),
+  ], [], {}, [xC(10), xS(16, o)], o),
 
   // --- icicle: one of the ceiling spikes is not decoration ---
   icicleHall: (o = {}) => R([
@@ -105,10 +125,10 @@ export const ROOMS = {
     's.....................e...',
     '##########################',
     '##########################',
-  ], [{ at: ';', delay: L(0.05, 0.03, o) }]),
+  ], [{ at: ';', delay: L(0.05, 0.03, o) }], {}, [cell(17, 2, ';'), cell(11, 2, ';')], o),
 
   // --- fakeDoor: celebrating drops the floor ---
-  fakeExit: () => R([
+  fakeExit: (o = {}) => R([
     '.............................',
     '.............................',
     '.............................',
@@ -116,10 +136,10 @@ export const ROOMS = {
     's....^.......X........e......',
     '############FFF##############',
     '############...##############',
-  ], [{ at: 'F', delay: 0.25 }]),
+  ], [{ at: 'F', delay: 0.25 }], {}, [xS(19, o), xC(9)], o),
 
   // --- spikeSwap: safe twice, spikes on the third pass (door runs you back and forth) ---
-  swapRun: () => R([
+  swapRun: (o = {}) => R([
     '..........................',
     '..........................',
     '..........................',
@@ -127,7 +147,7 @@ export const ROOMS = {
     's1.........,.........e2...',
     '##########################',
     '##########################',
-  ], [{ at: 'D', runTo: ['1', '2'], radius: 1.6 }], { final: true }),
+  ], [{ at: 'D', runTo: ['1', '2'], radius: 1.6 }], { final: true }, [cell(16, 'w', ','), cell(6, 'w', ',')], o),
 
   // --- bananaPeel ---
   bananaSlide: (o = {}) => R([
@@ -138,7 +158,7 @@ export const ROOMS = {
     's.....B....^^....B.......e....',
     '####################..########',
     '####################..########',
-  ], [{ at: 'B', speed: L(8.5, 10, o) }]),
+  ], [{ at: 'B', speed: L(8.5, 10, o) }], {}, [xC(14), xS(3, o)], o),
 
   // --- risingFloor: the floor lifts you into the ceiling spikes ---
   risingTrap: (o = {}) => R([
@@ -150,10 +170,13 @@ export const ROOMS = {
     's.....................e...',
     '##########[[[#############',
     '##########################',
-  ], [{ at: '[', speed: L(10, 13, o), delay: L(0.05, 0.03, o) }]),
+  ], [{ at: '[', speed: L(10, 13, o), delay: L(0.05, 0.03, o) }], {}, [
+    { cells: [[16, 'f', '['], [17, 'f', '[']] },
+    xS(4, o),
+  ], o),
 
   // --- rubberChicken ---
-  chickenSpikes: () => R([
+  chickenSpikes: (o = {}) => R([
     '..............................',
     '.................#######......',
     '.........######...^^^^^.......',
@@ -162,7 +185,7 @@ export const ROOMS = {
     's.....R.............R.....e...',
     '##############################',
     '##############################',
-  ]),
+  ], [], {}, [xS(13, o), xC(16)], o),
 
   // --- crusher ---
   crusherWalk: (o = {}) => R([
@@ -174,7 +197,7 @@ export const ROOMS = {
     's.......................e....',
     '#############################',
     '#############################',
-  ], [{ at: 'M', delay: L(0.16, 0.1, o) }]),
+  ], [{ at: 'M', delay: L(0.16, 0.1, o) }], {}, [xS(13, o), xS(4, o)], o),
 
   // --- conveyor ---
   conveyorSpike: (o = {}) => R([
@@ -185,7 +208,7 @@ export const ROOMS = {
     's..........^...............e..',
     '######>>>>#.##<<<<###..#######',
     '#####################..#######',
-  ], [{ at: '>', speed: L(3.2, 4.2, o) }, { at: '<', speed: L(3.2, 4.2, o) }]),
+  ], [{ at: '>', speed: L(3.2, 4.2, o) }, { at: '<', speed: L(3.2, 4.2, o) }], {}, [xS(25, o), xC(3)], o),
 
   // --- boxingGlove ---
   glovePunch: (o = {}) => R([
@@ -196,7 +219,7 @@ export const ROOMS = {
     's.....^^.......V........e....',
     '##########################..#',
     '##########################..#',
-  ], [{ at: 'V', dir: -1, reach: L(3.0, 3.4, o) }]),
+  ], [{ at: 'V', dir: -1, reach: L(3.0, 3.4, o) }], {}, [cell(21, 'w', 'V'), xS(11, o)], o),
 
   // --- saw: patrol in a tunnel, and saws on the floor of the bottom storey ---
   sawTunnel: (o = {}) => R([
@@ -208,7 +231,10 @@ export const ROOMS = {
     's...........&.........e...',
     '##########################',
     '##########################',
-  ], [{ at: '&', dir: -1, range: 5, speed: L(4, 5.5, o) }]),
+  ], [{ at: '&', dir: -1, range: 5, speed: L(4, 5.5, o) }], {}, [
+    cell(18, 'w', '&', [{ at: '&', x: 18, dir: 1, range: 2, speed: L(4, 5.5, o) }]),
+    xS(3, o),
+  ], o),
 
   sawPit: (o = {}) => R([
     '..............................',
@@ -218,10 +244,10 @@ export const ROOMS = {
     's........######.......#####e..',
     '######..................&.####',
     '##############################',
-  ], [{ at: '&', dir: -1, range: 12, speed: L(5, 6.5, o) }]),
+  ], [{ at: '&', dir: -1, range: 12, speed: L(5, 6.5, o) }], {}, [xS(3, o), xC(11, 3)], o),
 
   // --- springTrap ---
-  springCeiling: () => R([
+  springCeiling: (o = {}) => R([
     '.............................',
     '..........#####..............',
     '...........^^^...............',
@@ -230,7 +256,7 @@ export const ROOMS = {
     's...............!.......e....',
     '#############################',
     '#############################',
-  ]),
+  ], [], {}, [xS(6, o), xC(20)], o),
 
   // --- hungryFloor ---
   hungryGap: (o = {}) => R([
@@ -242,7 +268,7 @@ export const ROOMS = {
     's...........................e...',
     '#####..#########..###((#########',
     '#####..#########..###..#########',
-  ], [{ at: '(', delay: L(0.4, 0.3, o) }]),
+  ], [{ at: '(', delay: L(0.4, 0.3, o) }], {}, [xS(8, o), xC(25)], o),
 
   // --- boulder ---
   boulderRoll: (o = {}) => R([
@@ -253,7 +279,7 @@ export const ROOMS = {
     's.................O........e..',
     '##############################',
     '##############################',
-  ], [{ at: 'O', dir: -1, triggerDist: 7.5, speed: L(6.2, 7.5, o) }]),
+  ], [{ at: 'O', dir: -1, triggerDist: 7.5, speed: L(6.2, 7.5, o) }], {}, [xS(9, o), xC(23)], o),
 
   // --- closingWall: the corridor slams shut ahead, the high road is the way ---
   closingHall: (o = {}) => R([
@@ -266,7 +292,7 @@ export const ROOMS = {
     's..............]......e.....',
     '############################',
     '############################',
-  ], [{ at: ']', dx: -2, delay: L(0.06, 0.03, o) }]),
+  ], [{ at: ']', dx: -2, delay: L(0.06, 0.03, o) }], {}, [xS(3, o), xS(20, o)], o),
 
   // --- pieCannon (wall cannon) between floor and ceiling spikes ---
   cannonHall: (o = {}) => R([
@@ -278,7 +304,7 @@ export const ROOMS = {
     's............^^...........$e..',
     '##############################',
     '##############################',
-  ], [{ at: '$', dir: -1, speed: L(8.5, 10, o), cooldown: L(2.2, 1.6, o) }]),
+  ], [{ at: '$', dir: -1, speed: L(8.5, 10, o), cooldown: L(2.2, 1.6, o) }], {}, [xS(4, o), xS(19, o)], o),
 
   // --- controlsFlip ---
   flipRoom: (o = {}) => R([
@@ -289,10 +315,10 @@ export const ROOMS = {
     's.......U................e...',
     '#####..#####..###..##########',
     '#####..#####..###..##########',
-  ], [{ at: 'U', duration: L(3.0, 4.0, o) }]),
+  ], [{ at: 'U', duration: L(3.0, 4.0, o) }], {}, [xS(22, o), xC(15)], o),
 
   // --- bluffDoor: one of the two doors is a liar, and they swap after a death ---
-  bluffDoors: () => R([
+  bluffDoors: (o = {}) => R([
     '..................................',
     '..................................',
     '................C.................',
@@ -301,7 +327,7 @@ export const ROOMS = {
     's...?....R..........S.........e...',
     '#########GGG######################',
     '#########...######################',
-  ], [{ at: '?', swapOnDeath: true }, { at: 'S', delay: 0.12, radius: 1.6 }], { final: true }),
+  ], [{ at: '?', swapOnDeath: true }, { at: 'S', delay: 0.12, radius: 1.6 }], { final: true }, [xS(25, o), xC(2)], o),
 
   // --- sizeSwell: grow giant, the low spike ceiling ahead no longer fits ---
   swellHall: (o = {}) => R([
@@ -313,10 +339,10 @@ export const ROOMS = {
     's.......{.............e.....',
     '############################',
     '############################',
-  ], [{ at: '{', duration: L(3.5, 4.5, o) }]),
+  ], [{ at: '{', duration: L(3.5, 4.5, o) }], {}, [xS(4, o), xC(20)], o),
 
   // --- launchFloor ---
-  launchPad: () => R([
+  launchPad: (o = {}) => R([
     '############################',
     '......^^^^..................',
     '............................',
@@ -325,10 +351,10 @@ export const ROOMS = {
     's.......................e...',
     '######LLLL##################',
     '######....##################',
-  ], [{ at: 'L', delay: 0.12, boost: 21 }]),
+  ], [{ at: 'L', delay: 0.12, boost: 21 }], {}, [xS(14, o), xS(20, o)], o),
 
   // --- gravityFlip ---
-  gravRoom: () => R([
+  gravRoom: (o = {}) => R([
     '##############################',
     '............^^.......Y........',
     '..............................',
@@ -336,10 +362,10 @@ export const ROOMS = {
     's.....Y....................e..',
     '##############################',
     '##############################',
-  ]),
+  ], [], {}, [xS(3, o), xS(25, o)], o),
 
   // --- portalWall (final): the right wall sends you upstairs ---
-  portalUp: () => R([
+  portalUp: (o = {}) => R([
     '..................................',
     '.T............S...........e.......',
     '.######.FF.###################....',
@@ -348,10 +374,10 @@ export const ROOMS = {
     's.........B......................|',
     '##################################',
     '##################################',
-  ], [{ at: '|', to: 'T' }, { at: 'S', delay: 0.12, radius: 1.6 }], { final: true }),
+  ], [{ at: '|', to: 'T' }, { at: 'S', delay: 0.12, radius: 1.6 }], { final: true }, [xS(5, o), xC(20)], o),
 
   // --- shyPlatform ---
-  shySteps: () => R([
+  shySteps: (o = {}) => R([
     '..................................',
     '..................................',
     '......................I...........',
@@ -360,10 +386,10 @@ export const ROOMS = {
     's.................................',
     '######.//..######.//..######e#####',
     '######.....######.....############',
-  ], [{ at: '/', shift: 2, triggerDist: 5.0 }]),
+  ], [{ at: '/', shift: 2, triggerDist: 5.0 }], {}, [xS(3, o), xC(14)], o),
 
   // --- fakeCheckpoint ---
-  fakeFlag: () => R([
+  fakeFlag: (o = {}) => R([
     '............................',
     '............................',
     '............................',
@@ -371,10 +397,10 @@ export const ROOMS = {
     's..........K............e...',
     '######>>>>####>>>>#FFF.#####',
     '###################....#####',
-  ], [{ at: 'F', delay: 0.12 }]),
+  ], [{ at: 'F', delay: 0.12 }], {}, [xS(3, o), xC(12, 2)], o),
 
   // --- mimicRobot ---
-  robotCopy: () => R([
+  robotCopy: (o = {}) => R([
     '############################',
     '.......^^^..................',
     '............................',
@@ -382,10 +408,10 @@ export const ROOMS = {
     '.s.............E........e...',
     '########!#########..########',
     '##################..########',
-  ], [{ at: 'E', speed: 5.5 }]),
+  ], [{ at: 'E', speed: 5.5 }], {}, [xS(12, o), xC(22)], o),
 
   // --- booGhost ---
-  ghostChase: () => R([
+  ghostChase: (o = {}) => R([
     '############################',
     '.............M..............',
     '............................',
@@ -393,10 +419,10 @@ export const ROOMS = {
     '....Q.s.................e...',
     '###########..###############',
     '############################',
-  ], [{ at: 'Q', speed: 4.5 }, { at: 'M', delay: 0.16 }]),
+  ], [{ at: 'Q', speed: 4.5 }, { at: 'M', delay: 0.16 }], {}, [xS(18, o), xC(8)], o),
 
   // --- darkCandle ---
-  candleDark: () => R([
+  candleDark: (o = {}) => R([
     '.............................',
     '.............................',
     '.............................',
@@ -404,5 +430,5 @@ export const ROOMS = {
     's.....N....^^.....S......e...',
     '#############################',
     '#############################',
-  ], [{ at: 'S', delay: 0.09, radius: 1.6 }]),
+  ], [{ at: 'S', delay: 0.09, radius: 1.6 }], {}, [xS(22, o), xC(15)], o),
 };

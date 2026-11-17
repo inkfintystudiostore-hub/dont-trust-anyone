@@ -4,11 +4,13 @@
 import { ROOMS } from './rooms.js';
 import { COOP_ROOMS } from './coopRooms.js';
 import { composeLevel } from './compose.js';
+import { fillTraps } from './solo.js';
+import { trapTarget } from '../core/trapLedger.js';
 
 const ANY = { ...ROOMS, ...COOP_ROOMS };
 const SCHEDULE = [
   ['spikePop', 'plateRelay'], // C1 plates + laser
-  ['pitNear', 'weightBridge'], // C2 weight bridge
+  ['spikePop', 'pitNear', 'weightBridge'], // C2 weight bridge
   ['coinRow', 'keyVault'], // C3 key
   ['icicleHall', 'bananaSlide', 'bombDefuse'], // C4 bomb
   ['crusherWalk', 'plateRelay', 'twoChannels'], // C5 two colours
@@ -30,13 +32,15 @@ SCHEDULE.forEach((rooms, i) => rooms.forEach((r) => { if (!firstSeen.has(r)) fir
 
 export const COOP_RAW = SCHEDULE.map((rooms, i) => {
   const n = i + 1;
-  return composeLevel({
+  const build = (more) => composeLevel({
     name: `c${n}.name`,
     world: 5,
     coopOnly: true,
     // a room teaches at h=0 the first time it appears in co-op, then follows the level's hardness
-    rooms: rooms.map((r) => ({ id: r, ...ANY[r]({ h: firstSeen.get(r) === i ? 0 : i / LAST }) })),
+    rooms: rooms.map((r, k) => ({ id: r, ...ANY[r]({ h: firstSeen.get(r) === i ? 0 : i / LAST, more: more[k] }) })),
     signs: [{ x: 4.5, text: `c${n}.sign` }],
     taunts: [`c${n}.t1`, `c${n}.t2`, `c${n}.t3`],
   });
+  // solo trap rooms carry optional extras; co-op puzzle rooms have none (maxMore 0)
+  return fillTraps(build, rooms.map((r) => ANY[r]().maxMore ?? 0), trapTarget(i, SCHEDULE.length));
 });

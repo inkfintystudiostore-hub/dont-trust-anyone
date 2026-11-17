@@ -10,11 +10,12 @@ import { solveLevel } from '../src/core/solver.js';
 const COOP = process.argv.includes('--coop');
 const ROOMS = COOP ? COOP_ROOMS : SOLO;
 const hi = process.argv.indexOf('--h'); const H = hi > 0 ? Number(process.argv[hi + 1]) : 0;
-const args = process.argv.slice(2).filter((a, i, all) => a !== '--h' && a !== '--coop' && all[i - 1] !== '--h');
+const mi = process.argv.indexOf('--more'); const MORE = mi > 0 ? Number(process.argv[mi + 1]) : 0;
+const args = process.argv.slice(2).filter((a, i, all) => !a.startsWith('--') && !['--h', '--more'].includes(all[i - 1]));
 const names = args.length ? args : Object.keys(ROOMS);
 let bad = 0;
 for (const name of names) {
-  const room = ROOMS[name]({ h: H });
+  const room = ROOMS[name]({ h: H, more: MORE });
   const widths = new Set(room.rows.map((r) => r.length));
   if (widths.size > 1) { console.log(`${name}: ROW WIDTHS ${[...widths]}`); bad++; continue; }
   const level = parseLevel(composeLevel({ name, coopOnly: COOP, rooms: [room] }));

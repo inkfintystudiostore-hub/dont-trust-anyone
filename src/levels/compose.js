@@ -26,10 +26,15 @@ export function composeLevel({ rooms, traps = [], ...meta }) {
       s = s.replace(/e/g, last ? 'D' : (room.exit === 'X' ? 'X' : '.'));
       out[i] += s;
     });
-    for (const cfg of room.traps ?? []) {
+    // column-specific configs ({ at, x }) first: the first matching per-cell config wins in parseLevel
+    const cfgs = [...(room.traps ?? [])].sort((a, b) => (b.x !== undefined) - (a.x !== undefined));
+    for (const cfg of cfgs) {
       if (cfg.at === 'D') { if (last) traps = [...traps, cfg]; continue; }
+      const { x: onlyX, ...rest } = cfg;
       rows.forEach((r, i) => {
-        for (let x = 0; x < r.length; x++) if (r[x] === cfg.at) cellTraps.push({ ...cfg, cell: [x0 + x, H - 1 - i] });
+        for (let x = 0; x < r.length; x++) {
+          if (r[x] === cfg.at && (onlyX === undefined || x === onlyX)) cellTraps.push({ ...rest, cell: [x0 + x, H - 1 - i] });
+        }
       });
     }
   });

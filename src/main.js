@@ -257,6 +257,8 @@ const lobby = createCoopLobby(LEVELS, {
   onGuestState(st) {
     if (coopRole !== 'host' || !game.coop || game.dead || game.finished || transitioning) return;
     if (st?.levelIndex !== game.levelIndex) return;
+    // positions sent before the last death are stale: applying them would drag the guest back to the trap
+    if (Number.isFinite(st.deaths) && st.deaths !== game.deaths) return;
     const p1 = game.players?.[1];
     if (!p1 || p1.atDoor || p1.stun > 0 || p1.slip > 0) return;
     if (!Number.isFinite(st.x) || !Number.isFinite(st.y)) return;
@@ -1052,6 +1054,7 @@ function frame(now) {
           lobby.session.sendGuestState({
             levelIndex: game.levelIndex,
             seq: guestInputSeq,
+            deaths: game.deaths,
             x: Math.round(p1.x * 1000) / 1000,
             y: Math.round(p1.y * 1000) / 1000,
             vx: Math.round(p1.vx * 100) / 100,

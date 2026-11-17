@@ -30,13 +30,13 @@ function runLink(level, guestInputs, hostInputs, ticks) {
     while (toHost.length && toHost[0].at <= tick) {
       const st = toHost.shift().st;
       const p1 = host.players[1];
-      if (!host.dead && !p1.atDoor && Math.hypot(st.x - p1.x, st.y - p1.y) < 5) { p1.x = st.x; p1.y = st.y; p1.vx = st.vx; p1.vy = st.vy; }
+      if (!host.dead && !p1.atDoor && st.deaths === host.deaths && Math.hypot(st.x - p1.x, st.y - p1.y) < 5) { p1.x = st.x; p1.y = st.y; p1.vx = st.vx; p1.vy = st.vy; }
     }
     // guest predicts
     const gin = guestInputs(guest.players[1], tick);
     stepPlayerLocal(guest, 1, gin, DT, { predictTraps: true });
     rec.recordPrediction(++seq, guest.players[1]);
-    if (tick % 2 === 0) { const p = guest.players[1]; toHost.push({ at: tick + LAG, st: { x: p.x, y: p.y, vx: p.vx, vy: p.vy } }); }
+    if (tick % 2 === 0 && !guest.dead) { const p = guest.players[1]; toHost.push({ at: tick + LAG, st: { x: p.x, y: p.y, vx: p.vx, vy: p.vy, deaths: guest.deaths } }); }
     // host simulates
     const evs = step(host, [hostInputs(host.players[0], tick), gin], DT);
     for (const ev of evs) toGuest.push({ at: tick + LAG, kind: 'event', ev: { ...ev } });
