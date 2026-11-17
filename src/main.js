@@ -1075,7 +1075,7 @@ function frame(now) {
       if (playing && game.players[1] && !game.dead) {
         const p1 = game.players[1];
         const moving = Math.abs(p1.vx) > 0.05 || Math.abs(p1.vy) > 0.05 || !p1.onGround;
-        const posStride = moving ? 2 : 6;
+        const posStride = moving ? (lobby.session.isP2P() ? 1 : 2) : 6;
         if (localJumped || localLanded || (stateSyncTick++ % posStride === 0)) {
           lobby.session.sendGuestState({
             levelIndex: game.levelIndex,
@@ -1099,6 +1099,7 @@ function frame(now) {
       hitStop = Math.max(0, hitStop - dt);
     } else {
       acc += dt;
+      let snapDue = false; // one snapshot per rendered frame, even after a catch-up burst of sim steps
       while (acc >= FIXED && !transitioning && !game.finished) {
         acc -= FIXED;
         const stepIn = coopRole === 'host'
@@ -1128,13 +1129,13 @@ function frame(now) {
             && p0.onGround && p1.onGround
             && Math.abs(p0.vx) < 0.05 && Math.abs(p0.vy) < 0.05
             && Math.abs(p1.vx) < 0.05 && Math.abs(p1.vy) < 0.05;
-          const syncStride = playersIdle ? 6 : 2;
-          if (evs.length > 0 || (stateSyncTick++ % syncStride === 0)) {
-            sendHostSnapshot();
-          }
+          // full 60 Hz over the P2P data channel; the Worker relay keeps 30 Hz to stay light
+          const syncStride = playersIdle ? 6 : (lobby.session.isP2P() ? 1 : 2);
+          if (evs.length > 0 || (stateSyncTick++ % syncStride === 0)) snapDue = true;
         }
         if (transitioning || game.finished) { acc = 0; break; }
       }
+      if (snapDue && coopRole === 'host') sendHostSnapshot();
     }
 
     const snapAlpha = coopRole === 'guest'

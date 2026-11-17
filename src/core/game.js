@@ -1539,6 +1539,9 @@ function win(g) {
   else g.finished = true;
 }
 
+// 4 decimals (0.1 mm) keeps 60 Hz snapshots ~30% smaller; non-numbers pass through untouched
+const q4 = (v) => (typeof v === 'number' ? Math.round(v * 10000) / 10000 : v);
+
 /** Compact JSON-safe state snapshot broadcast from Host (P1) to Guest (P2) in 2P co-op. */
 export function exportCoopSnapshot(g, meta = null) {
   const snap = {
@@ -1559,7 +1562,7 @@ export function exportCoopSnapshot(g, meta = null) {
     finished: g.finished,
     door: g.door ? { x: g.door.x, y: g.door.y, ran: g.door.ran, stopIndex: g.door.stopIndex } : null,
     players: g.players.map((p) => ({
-      x: p.x, y: p.y, vx: p.vx, vy: p.vy, face: p.face, gravDir: p.gravDir,
+      x: q4(p.x), y: q4(p.y), vx: q4(p.vx), vy: q4(p.vy), face: p.face, gravDir: p.gravDir,
       onGround: p.onGround, stun: p.stun, slip: p.slip, slipDir: p.slipDir,
       flipped: p.flipped, atDoor: p.atDoor, beltVx: p.beltVx, speedMul: p.speedMul,
       pieTimer: p.pieTimer, danceTimer: p.danceTimer, magnetPull: p.magnetPull,
@@ -1575,7 +1578,7 @@ export function exportCoopSnapshot(g, meta = null) {
       acc.push({
         i,
         kind: t.kind,
-        state: t.state, offsetY: t.offsetY, x: t.x, y: t.y, ext: t.ext, vx: t.vx,
+        state: t.state, offsetY: q4(t.offsetY), x: q4(t.x), y: q4(t.y), ext: q4(t.ext), vx: q4(t.vx),
         face: t.face, shy: t.shy, onGround: t.onGround, revealed: t.revealed,
         active: t.active, triggered: t.triggered, collected: t.collected, pressed: t.pressed,
         open: t.open, defuse: t.defuse, defused: t.defused, defusing: t.defusing,

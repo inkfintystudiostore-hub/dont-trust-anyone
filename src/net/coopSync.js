@@ -65,18 +65,25 @@ function interpolateDoor(a, b, t) {
  */
 export function createSnapshotBuffer(opts = {}) {
   const fixedDt = opts.fixedDt ?? DEFAULT_FIXED_DT;
-  const interpDelay = opts.interpDelay ?? DEFAULT_INTERP_DELAY;
+  const fixedDelay = opts.interpDelay;
   const maxExtrap = opts.maxExtrap ?? DEFAULT_MAX_EXTRAP;
 
   let buffer = [];
   let clockOffset = null;
   let fallbackTick = 0;
+  // adaptive delay: ~1.5 snapshot intervals, so a 60 Hz P2P link stays near-live and a 30 Hz relay stays gap-free
+  let gapAvg = DEFAULT_INTERP_DELAY / 1.5;
+  // how late (s) packets typically arrive vs the fastest path; the buffer must cover it or the view extrapolates and snaps
+  let lateAvg = 0;
+  const currentDelay = () => fixedDelay ?? Math.max(0.028, Math.min(0.14, gapAvg * 1.5 + 0.004 + lateAvg * 1.5));
 
   return {
     reset() {
       buffer = [];
       clockOffset = null;
       fallbackTick = 0;
+      gapAvg = DEFAULT_INTERP_DELAY / 1.5;
+      lateAvg = 0;
     },
 
     size() {
@@ -107,11 +114,23 @@ export function createSnapshotBuffer(opts = {}) {
       }
 
       const sampleOffset = serverTime - localTime;
+      if (clockOffset !== null) {
+        const late = Math.min(0.2, Math.max(0, clockOffset - sampleOffset));
+        lateAvg += (late - lateAvg) * (late > lateAvg ? 0.3 : 0.03); // grow fast on a jitter spike, shrink slowly
+      }
       if (clockOffset === null || Math.abs(sampleOffset - clockOffset) > 0.25) {
         clockOffset = sampleOffset;
+      } else if (sampleOffset > clockOffset) {
+        // a faster-than-usual packet shows the true path latency: follow it quickly
+        clockOffset += (sampleOffset - clockOffset) * 0.5;
       } else {
-        // Gentle EWMA tracks clock drift without jittering renderTime
-        clockOffset += (sampleOffset - clockOffset) * 0.12;
+        // late packets (jitter) pull the offset down only slowly, so renderTime never jitters with them
+        clockOffset += (sampleOffset - clockOffset) * 0.02;
+      }
+
+      if (buffer.length > 0) {
+        const gap = serverTime - buffer[buffer.length - 1].serverTime;
+        if (gap > 0 && gap < 0.5) gapAvg += (gap - gapAvg) * 0.1;
       }
 
       buffer.push({ tick, serverTime, snap });
@@ -122,7 +141,7 @@ export function createSnapshotBuffer(opts = {}) {
 
     sample(localTime) {
       if (buffer.length === 0 || clockOffset === null) return null;
-      const renderTime = localTime + clockOffset - interpDelay;
+      const renderTime = localTime + clockOffset - currentDelay();
 
       // Trim snapshots that are far behind renderTime (keep at least 2 when available)
       while (buffer.length > 2 && buffer[1].serverTime <= renderTime) {

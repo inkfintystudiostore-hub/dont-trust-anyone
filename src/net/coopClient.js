@@ -106,13 +106,18 @@ export function createCoopSession(handlers) {
     }
   };
 
+  // state streams are disposable: a newer one replaces an older one, so when the link is backed up
+  // (TCP relay on a weak connection) skip them instead of queueing - queued ones arrive seconds late
+  const isStream = (msg) => msg.type === 'state' || msg.type === 'guest_state';
   const sendFast = (msg) => {
     if (dc && dc.readyState === 'open') {
+      if (isStream(msg) && dc.bufferedAmount > 16_384) return;
       try {
         dc.send(JSON.stringify(msg));
         return;
       } catch { /* fallback to WebSocket */ }
     }
+    if (isStream(msg) && socket && socket.bufferedAmount > 32_768) return;
     send(msg);
   };
 
