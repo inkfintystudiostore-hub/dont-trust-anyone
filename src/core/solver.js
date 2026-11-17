@@ -11,10 +11,12 @@ import { createGame, step, cloneGame } from './game.js';
 import { encodeReplay, DT } from './replay.js';
 
 const SOLO_ACTS = ['r', 'l', '.', 'R', 'L', 'J'];
-// Co-op: drop joint idle+idle and pairs where both jump in place, keeping the search tractable.
+// Co-op: move together (same input), or one player holds still (e.g. on a plate) while the other moves.
 const COOP_ACTS = [];
-for (const a of SOLO_ACTS) for (const b of SOLO_ACTS) if (!(a === '.' && b === '.')) COOP_ACTS.push([a, b]);
-COOP_ACTS.push(['.', '.']);
+for (const a of SOLO_ACTS) {
+  COOP_ACTS.push([a, a]);
+  if (a !== '.') COOP_ACTS.push([a, '.'], ['.', a]);
+}
 const DIR = { '.': 0, l: -1, r: 1, J: 0, L: -1, R: 1 };
 const JUMP = { J: true, L: true, R: true };
 
@@ -25,9 +27,13 @@ function stateKey(g) {
   for (const p of g.players) {
     s += `${r(p.x, 6)},${r(p.y, 6)},${r(p.vx, 1)},${r(p.vy, 0.34)},${p.onGround ? 1 : 0},${p.gravDir},${p.flipped > 0 ? 1 : 0},${p.atDoor ? 1 : 0},${p.stun > 0 ? 1 : 0},${p.slip > 0 ? 1 : 0}|`;
   }
+  let minX = Infinity, maxX = -Infinity;
+  for (const p of g.players) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); }
   for (const t of g.traps) {
     s += `${t.state[0]}${t.active ? 1 : 0}${t.revealed ? 1 : 0}${t.collected ? 1 : 0}${t.triggered ? 1 : 0}${t.armed ? 1 : 0}${t.open ? 1 : 0}${t.defused ? 1 : 0}${t.stopIndex}${t.curCx}`;
-    if (t.state !== 'idle' || t.vx || t.vy) s += `${r(t.x, 2)},${r(t.y + t.offsetY, 2)},${r(t.timer, 5)}`;
+    // Exact motion only matters near the players: a saw cycling rooms away must not make every state unique.
+    const near = t.x > minX - 10 && t.x < maxX + 16;
+    if (near && (t.state !== 'idle' || t.vx || t.vy)) s += `${r(t.x, 2)},${r(t.y + t.offsetY, 2)},${r(t.timer, 5)}`;
     s += ';';
   }
   if (g.door) s += `D${r(g.door.x, 2)}${g.door.shrunk ? 1 : 0}`;
@@ -51,11 +57,20 @@ function score(g) {
  * @param {{coop?: boolean, chunk?: number, beam?: number, maxDepth?: number, maxMs?: number}} opts
  * @returns {{replay: string|string[], frames: number}|null}
  */
-export function solveLevel(level, { coop = false, chunk = 4, beam = 3000, maxDepth = 1500, maxMs = 60000 } = {}) {
-  const root = createGame([level], 0, { coop });
-  const acts = coop ? COOP_ACTS : SOLO_ACTS.map((a) => [a]);
+export function solveLevel(level, opts = {}) {
+  return searchFrom(createGame([level], 0, { coop: !!opts.coop }), opts);
+}
+
+/**
+ * Beam search from any game state (not mutated) until `goal(g)` (default: level finished).
+ * Used whole-level for solo and per room segment for co-op (see coopSolver.js).
+ * @returns {{replay: string|string[], frames: number}|null}
+ */
+export function searchFrom(root, { coop = false, lockstep = false, chunk = 4, beam = 3000, maxDepth = 1500, maxMs = 60000, goal = (g) => g.finished, score: scoreFn = score } = {}) {
+  // lockstep: both players press the same keys (co-op trap rooms), as reliable as the solo search
+  const acts = !coop ? SOLO_ACTS.map((a) => [a]) : lockstep ? SOLO_ACTS.map((a) => [a, a]) : COOP_ACTS;
   const seen = new Set([stateKey(root)]);
-  let layer = [{ g: root, path: null }];
+  let layer = [{ g: cloneGame(root), path: null }];
   const t0 = Date.now();
   for (let depth = 0; depth < maxDepth && layer.length; depth++) {
     if (Date.now() - t0 > maxMs) return null;
@@ -72,11 +87,11 @@ export function solveLevel(level, { coop = false, chunk = 4, beam = 3000, maxDep
         }
         if (!ok) continue;
         const path = { prev: node.path, a };
-        if (c.finished) return { replay: unwind(path, chunk, a.length), frames: (depth + 1) * chunk };
+        if (goal(c)) return { replay: unwind(path, chunk, a.length), frames: (depth + 1) * chunk };
         const k = stateKey(c);
         if (seen.has(k)) continue;
         seen.add(k);
-        next.push({ g: c, path, s: score(c) });
+        next.push({ g: c, path, s: scoreFn(c) });
       }
     }
     if (next.length > beam) {

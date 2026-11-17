@@ -21,7 +21,7 @@
 export const TILE = { EMPTY: 0, SOLID: 1, SPIKES: 2 };
 
 const TRAP_BUILDERS = {
-  F: (base, cfg) => ({ kind: 'fallingFloor', ...base, delay: cfg.delay ?? 0.25 }),
+  F: (base, cfg) => ({ kind: 'fallingFloor', ...base, delay: cfg.delay ?? 0.25, near: cfg.near ?? 0 }),
   G: (base) => ({ kind: 'ghostFloor', ...base }),
   I: (base) => ({ kind: 'invisibleBlock', ...base }),
   B: (base, cfg) => ({ kind: 'bananaPeel', ...base, duration: cfg.duration ?? 1.5, speed: cfg.speed ?? 8.5 }),
@@ -95,8 +95,10 @@ export function parseLevel({ name, world = 1, coopOnly = false, breather = false
   });
   if (!start) throw new Error(`level "${name}" has no P`);
 
-  const cfg = (ch) => traps.find((t) => t.at === ch) ?? {};
-  const trapDefs = cells.map(({ ch, cx, cy }) => TRAP_BUILDERS[ch]({ cx, cy, cell: cy * W + cx }, cfg(ch)));
+  // per-cell config ({ at, cell: [cx, cy] }) wins over a level-wide one ({ at })
+  const cfg = (ch, cx, cy) => (cx !== undefined && traps.find((t) => t.at === ch && t.cell && t.cell[0] === cx && t.cell[1] === cy))
+    || traps.find((t) => t.at === ch && !t.cell) || {};
+  const trapDefs = cells.map(({ ch, cx, cy }) => TRAP_BUILDERS[ch]({ cx, cy, cell: cy * W + cx }, cfg(ch, cx, cy)));
   const doorCfg = cfg('D');
   if (door && doorCfg.shrink) {
     door.shrink = true;

@@ -5,10 +5,10 @@ import { LEVELS } from '../levels.js';
 describe('all 62 levels across worlds 1-5', () => {
   it('has all 62 levels (Worlds 1-4 + World 5 Couples Co-op)', () => {
     expect(LEVELS.length).toBe(62);
-    expect(LEVELS.slice(0, 10).every((l) => l.world === 1)).toBe(true);
-    expect(LEVELS.slice(10, 20).every((l) => l.world === 2)).toBe(true);
-    expect(LEVELS.slice(20, 30).every((l) => l.world === 3)).toBe(true);
-    expect(LEVELS.slice(30, 47).every((l) => l.world === 4)).toBe(true);
+    expect(LEVELS.slice(0, 12).every((l) => l.world === 1)).toBe(true);
+    expect(LEVELS.slice(12, 24).every((l) => l.world === 2)).toBe(true);
+    expect(LEVELS.slice(24, 36).every((l) => l.world === 3)).toBe(true);
+    expect(LEVELS.slice(36, 47).every((l) => l.world === 4)).toBe(true);
     expect(LEVELS.slice(47, 62).every((l) => l.world === 5 && l.coopOnly)).toBe(true);
   });
 

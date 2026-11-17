@@ -2,7 +2,7 @@ import {
   WebGLRenderer, Scene, PerspectiveCamera, HemisphereLight, DirectionalLight, PCFShadowMap, SRGBColorSpace,
   ACESFilmicToneMapping, Vector3,
 } from 'three';
-import { LEVELS, GENERIC_TAUNTS } from './levels.js';
+import { LEVELS, RAW_LEVELS, GENERIC_TAUNTS } from './levels.js';
 import { createGame, loadLevel, restartAttempt, step, stepPlayerLocal, exportCoopSnapshot, applyCoopSnapshot } from './core/game.js';
 import { createModelStore } from './render/assets.js';
 import { buildWorld } from './render/world.js';
@@ -706,8 +706,10 @@ function handleRestart(fromRemote = false) {
 }
 function showHint() {
   if (!playing) return;
-  const num = game.level.name.match(/^l(\d+)\.name$/)?.[1];
-  const hintKey = num ? `l${num}.hint` : null;
+  // hint for the room the player is standing in
+  const px = game.player.x;
+  const room = RAW_LEVELS[game.levelIndex]?.spans?.find((s) => px >= s.x0 && px < s.x0 + s.w);
+  const hintKey = room?.id ? `room.${room.id}.hint` : null;
   const text = hintKey && t(hintKey) !== hintKey
     ? t(hintKey)
     : t(game.level.taunts?.[0] ?? 'taunt.1');

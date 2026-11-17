@@ -334,32 +334,38 @@ Trap tuning: `traps: [{ at: 'D', runTo: 'T', radius: 2.2 }, { at: 'S', delay: 0.
 | Mini-boss (har world ka 10th) | 15–30 | 5–8 min |
 🔜 Playtest mein naapna (`playtest-report` skill), aur jo level 30+ deaths le, uska window bada karna.
 
-### 6.4 World 1 (Candy Meadow), 10 levels ✅
-| # | Naam | Naya idea | Twist | Status |
-|---|---|---|---|---|
-| 1 | Bilkul Aasaan | chalo, koodo | girta floor, darwaza start pe bhaage | ✅ |
-| 2 | Upar Mat Dekhna | gap jump | invisible block + chhupe kaante | ✅ |
-| 3 | Bharosa Karo | 2 raaste | nakli pul, upar girta tile, darwaza kaante ke peeche | ✅ |
-| 4 | Sign Sach Bolta Hai | sign | sign is baar sach bolta hai… player nahi maanta 😈 | ✅ |
-| 5 | Chhutti | breather | koi trap nahi… sirf aakhri `FFFF` tiles 😇 | ✅ |
-| 6 | Kele Ka Mausam | banana peel | phisal ke kaanton/gaddhe tak | ✅ |
-| 7 | Murgi Mat Dabao | rubber chicken | pehli safe climb, doosri chhat ke kaanton mein | ✅ |
-| 8 | Coin Lo, Maro | Chomp coin | lalach + falling floor bait | ✅ |
-| 9 | Jashn Mubarak | nakli LEVEL COMPLETE | jashn mein floor gayab | ✅ |
-| 10 | Darwaza Pakdo (mini-boss) | darwaza bhaagta rehta hai | 4 baar bhaagta hai, har baar naye trap pe | ✅ |
+### 6.4 Level Devil redesign (17 Nov 2026) ✅
+Inspiration: *Level Devil* trailer (Unept). Har level ab **kamron (rooms)** se bana hai: ek room = ek screen, ek trap family. Shuru mein 1 room, aakhri levels mein 6 rooms, isliye lambai badhti hai par feel wahi rehti hai.
 
-### 6.5 World 2 (`L11–L20`), World 3 (`L21–L30`), World 4 (`L31–L35`), & World 5 Couple Co-op (`L36–L42`) ✅
-- **World 2 (`L11–L20` ✅):**
-  - L11 *Factory Gate* (`>`/`<` conveyors), L12 *Chhat Se Dhadaam* (`M` crushers), L13 *Punch Line* (`V` boxing glove), L14 *Bhaago Patthar!* (`O` boulder + `S`), L15 *Tea Break* (breather + `K` + `FFF.`), L16 *Ulta Pulta* (`U` controls flip), L17 *Assembly Line* (`>`/`<` + `M` + `V`), L18 *Aaa-Chhoo!* (`W` sneeze clouds), L19 *Nakli Save* (`K` + `X` + `O`), L20 *Toy Master* (4-stop mini-boss).
-- **World 3 (`L21–L30` ✅):**
-  - L21 *Ulta Chhat* (`Y` gravity flip + ceiling spikes), L22 *Chipchipa Caramel* (`Z` slow floor + `M`), L23 *Bhootiya Pul* (`G` bridge + high road), L24 *Batti Gul* (`N` dark candle memory), L25 *Meethi Neend* (breather + `Y` + `GGG`), L26 *Double Flip* (`Y` + `U`), L27 *Ghost Cake* (`G` + `C` + `I`), L28 *Haunted Storm* (`N` + `W` + `R`), L29 *Bakery Ka Dhoka* (`K` + `Y` + `X`), L30 *Master Chef Darwaza* (5-stop final boss).
-- **World 4 Mind Games (`L31–L35` ✅):**
-  - L31 *Upar Launch?* (`L` launch floor + `A` anti-jump), L32 *Tohfa Kabool?* (`J` mystery gift box), L33 *Ulta Robot* (`E` mirror toy robot), L34 *Sharmila Bhoot* (`Q` peek-a-boo ghost), L35 *Dimaag Ki Dahi* (Worlds 1–4 finale).
-- **World 5 Couple Co-op (`L36–L42`, `coopOnly: true` ✅):**
-  - L36 *Pehle Chabi, Phir Pyaar* (`H`/`=` & `h`/`-` airlock key handoff), L37 *Bomb Squad!* (`@` defusal + `H` + `S`), L38 *Chhat Sambhalna* (upper switch shielding triple laser), L39 *Ulta Pulta Squad* (`A` + `@` + `E` pit bait), L40 *Bhoot Aur Chabi* (watchtower `Q` freeze + `*`), L41 *Twin Keys Dhoka* (`**` + `L` under ceiling spikes), L42 *Do Jism Ek Jaan* (Couples Grand Finale).
+| Band | Levels | Rooms | Width (tiles) |
+|---|---|---|---|
+| Tutorial-troll | L1–L5 | 1–2 | 26–56 |
+| Warm-up | L6–L12 | 2 | 50–60 |
+| Rising | L13–L22 | 3 | 78–90 |
+| Hard | L23–L34 | 4 | 112–123 |
+| Devil | L35–L44 | 3–5 | 85–154 |
+| Finale | L45–L47 | 6 | 170–178 |
+| Co-op | L48–L62 | 2–6 | 52–173 |
+
+Breathers: L10, L15, L20, L25, L30, L35, L40 (chhote, par phir bhi ek purana trap).
+
+**Kahan kya hai:**
+- Rooms: `src/levels/rooms.js` (solo traps), `src/levels/coopRooms.js` (co-op puzzles + unki `script` choreography). Har room `h` (0..1) leta hai: debut pe 0, baad mein level ke hisaab se tight.
+- Level list: `src/levels/solo.js` (SCHEDULE), `src/levels/coop.js`. Jodne wala: `src/levels/compose.js`.
+- Text: `src/levels/soloText.js` (`sN.*`), `src/levels/coopText.js` (`cN.*`). Hint button: `src/levels/roomHints.js` (jis room mein khade ho uska hint).
+
+**Callback rule (har purana trap wapas aata hai, aur mushkil hokar):** `src/core/trapLedger.js` + `trapLedger.test.js`. Solo: har trap ≥3 levels, do appearances ke beech ≤8 levels, aakhri 10 levels mein zaroor, kabhi debut se aasaan nahi; L6 se har level mein max 1 naya trap aur kam se kam 1 purana. Co-op: ≥3 levels, gap ≤6, aakhri 5 mein.
+
+**Fairness:** `node tools/solve-levels.mjs` har level room-by-room solve karke `src/replays.json` likhta hai (trap rooms = beam-search bot, co-op puzzle rooms = script). `replays.test.js`: replay jeetna chahiye, aur sirf right bhaagne wala kabhi nahi jeetta. Naya room banao to `node tools/check-rooms.mjs [--coop] [--h 1]`.
+
+**Naye traps:** `;` girta kaanta (bilkul chhat ke kaanton jaisa dikhta hai), `]` band hoti deewar, `[` upar uthti zameen, `&` aara (Meshy model), `{` size swell (Momo giant), `,` spike-swap (2 baar safe, teesri baar kaante). `F` ka `near`: paas aate hi gaddha khulta hai.
+**Solo se hataye (code/model abhi bhi hain):** gift box, countdown, magnet, disco, sneeze, caramel, anti-jump.
+
+### 6.5 Worlds
+World 1 = L1–L12, World 2 = L13–L24, World 3 = L25–L36, World 4 = L37–L47, World 5 (Couples Co-op, `coopOnly`) = L48–L62. Har level ka naya trap aur rooms ki list `src/levels/solo.js` / `src/levels/coop.js` mein comment ke saath hai.
 
 ### 6.6 Level map ✅
-Resin-miniature jaisa 3D tabletop diorama (`src/render/diorama.js`) + `src/save.js` (`localStorage` progress & `bestDeaths` per level). 5 world islands (`42` level nodes), aur selected node pe uddta kabootar.
+Resin-miniature jaisa 3D tabletop diorama (`src/render/diorama.js`) + `src/save.js` (`localStorage` progress & `bestDeaths` per level, save key `dta.save.v2`). 5 world islands (`62` level nodes), aur selected node pe uddta kabootar.
 
 ✍️ Tumhara note:
 

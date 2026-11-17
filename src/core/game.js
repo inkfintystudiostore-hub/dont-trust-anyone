@@ -494,7 +494,10 @@ function updateTraps(g, dt) {
       case 'fallingFloor': {
         if (t.state === 'idle') {
           for (let pi = 0; pi < players.length; pi++) {
-            if (standingOn(players[pi], t.cx, t.cy)) {
+            const p = players[pi];
+            // near > 0: Level Devil pit, drops as you approach (only from above the floor)
+            const close = t.near > 0 && !p.atDoor && Math.abs(p.x - (t.cx + 0.5)) < t.near && p.y >= t.cy + 0.9 && p.y < t.cy + 4;
+            if (close || standingOn(p, t.cx, t.cy)) {
               t.state = 'shaking'; t.timer = t.delay;
               g.lastTrapIndex = i; g.lastTrapTime = g.time;
               emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 });

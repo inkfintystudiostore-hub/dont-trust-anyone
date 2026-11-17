@@ -253,6 +253,7 @@ describe('analog moveX + co-op coordination traps', () => {
     // 2. Solo win at index 46 finishes Solo campaign cleanly instead of entering coopOnly
     const soloGame = createGame(LEVELS, 46, { coop: false });
     const l35 = soloGame.level;
+    for (const t of soloGame.traps) if (t.kind === 'runningDoor') t.stopIndex = t.stops.length; // L47 door already ran
     expect(soloGame.levelIndex).toBe(46);
     soloGame.players[0].x = l35.door.x;
     soloGame.players[0].y = l35.door.y;
@@ -264,6 +265,7 @@ describe('analog moveX + co-op coordination traps', () => {
     // 3. Co-op starting at L1 advances cleanly to L2 only when BOTH reach the door,
     // and Co-op at index 46 advances into World 5 index 47 when BOTH reach door together
     const coopL35 = createGame(LEVELS, 46, { coop: true });
+    for (const t of coopL35.traps) if (t.kind === 'runningDoor') t.stopIndex = t.stops.length;
     coopL35.players[0].x = l35.door.x;
     coopL35.players[0].y = l35.door.y;
     step(coopL35, [NONE, NONE], DT);

@@ -1,9 +1,9 @@
-// Solves levels with the beam-search bot and stores replays in src/replays.json.
-// Usage: node tools/solve-levels.mjs [all|stale|1,5,12] [--chunk 4] [--beam 3000]
+// Solves levels room by room (src/core/spanSolver.js) and stores replays in src/replays.json.
+// Usage: node tools/solve-levels.mjs [stale|all|1,5,12] [--beam 1500] [--ms 90000]
 // Default "stale": only levels whose replay is missing or whose level data changed.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { LEVELS } from '../src/levels.js';
-import { solveLevel } from '../src/core/solver.js';
+import { LEVELS, RAW_LEVELS } from '../src/levels.js';
+import { solveBySpans } from '../src/core/spanSolver.js';
 import { runReplay, levelHash } from '../src/core/replay.js';
 
 const file = new URL('../src/replays.json', import.meta.url);
@@ -24,11 +24,8 @@ for (const i of picks) {
   const coop = level.coopOnly;
   const t0 = Date.now();
   let res = null;
-  for (const chunk of [opt('chunk', 4), 3, 2]) {
-    res = solveLevel(level, { coop, chunk, beam: opt('beam', coop ? 1500 : 3000), maxMs: opt('ms', 90000) });
-    if (res && runReplay(level, res.replay, { coop }).won) break;
-    res = null;
-  }
+  res = solveBySpans(level, RAW_LEVELS[i].spans, { coop, beam: opt('beam', 1500), maxMs: opt('ms', 90000) });
+  if (res && !runReplay(level, res.replay, { coop }).won) res = null;
   const ms = Date.now() - t0;
   if (!res) { failed++; console.log(`L${i + 1} ${level.name}: NO SOLUTION (${ms} ms)`); continue; }
   db[level.name] = { hash: levelHash(level), replay: res.replay };
