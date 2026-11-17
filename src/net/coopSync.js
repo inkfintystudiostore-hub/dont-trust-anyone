@@ -8,6 +8,10 @@ const DEFAULT_FIXED_DT = 1 / 60;
 const DEFAULT_INTERP_DELAY = 0.038; // 38 ms (~2.3 ticks at 60 Hz)
 const DEFAULT_MAX_EXTRAP = 0.12;   // 120 ms max dead-reckoning on packet delay
 const MAX_HISTORY = 180;           // 3 seconds at 60 Hz
+// traps whose position moves continuously and is smoothed between host snapshots
+const MOVING_KINDS = new Set(['boulder', 'saw', 'mimicRobot', 'booGhost']);
+// of those, the ones the guest does NOT simulate itself (saw is predicted locally, see game.js)
+const REMOTE_MOVING = new Set(['boulder', 'mimicRobot', 'booGhost']);
 
 function lerp(a, b, t) {
   return a + (b - a) * t;
@@ -146,7 +150,7 @@ export function createSnapshotBuffer(opts = {}) {
             ? [interpolatePlayer(sa.players?.[0], sb.players[0], t)]
             : sb.players;
           const traps = Array.isArray(sb.traps)
-            ? sb.traps.map((tb, idx) => (tb?.kind === 'boulder' ? interpolateTrap(sa.traps?.[idx], tb, t) : tb))
+            ? sb.traps.map((tb) => (MOVING_KINDS.has(tb?.kind) ? interpolateTrap(sa.traps?.find((x) => x.i === tb.i), tb, t) : tb))
             : sb.traps;
           const door = interpolateDoor(sa.door, sb.door, t);
           return {
@@ -209,7 +213,7 @@ export function applyInterpolatedRemoteVisuals(game, interpSnap) {
       const src = interpSnap.traps[idx];
       const ti = Number.isInteger(src?.i) ? src.i : idx;
       const dst = game.traps[ti];
-      if (!dst || !src || dst.kind !== 'boulder') continue;
+      if (!dst || !src || !REMOTE_MOVING.has(dst.kind)) continue;
       if (Number.isFinite(src.x)) {
         dst.x = src.x;
         dst.prevX = src.x;
@@ -286,6 +290,15 @@ export function createGuestReconciler() {
       p1.magnetPull = src1.magnetPull;
       p1.trapAnim = src1.trapAnim;
       p1.trapAnimTimer = src1.trapAnimTimer;
+      // size swell can be triggered by the host's view of the guest too
+      // ...but a swell the guest predicted itself is kept until the host hears about it
+      const keepLocalSwell = src1.size === 1 && p1.size !== 1 && p1.sizeTimer > 0.2;
+      if (Number.isFinite(src1.size) && !keepLocalSwell) {
+        p1.size = src1.size;
+        p1.sizeTimer = src1.sizeTimer;
+        p1.halfW = src1.halfW;
+        p1.height = src1.height;
+      }
 
       if (ackSeq <= 0) return;
 
@@ -331,15 +344,13 @@ export function createGuestReconciler() {
         return;
       }
 
-      // Client-authoritative co-op: only snap/blend velocity if Host stunned/slipped Guest
+      // Client-authoritative co-op: only snap/blend velocity if Host stunned/slipped Guest.
+      // (No position correction here: a leftover correction loop used undefined vars and threw on
+      // every drifting snapshot, which aborted the guest's respawn/level-change handling.)
       if (src1.stun > 0 || src1.slip > 0) {
         p1.vx = src1.vx;
         p1.vy = src1.vy;
         p1.onGround = src1.onGround;
-      }
-      for (let i = 0; i < predictions.length; i++) {
-        predictions[i].x += corrX;
-        predictions[i].y += corrY;
       }
     },
 

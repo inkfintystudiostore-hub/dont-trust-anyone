@@ -4,14 +4,33 @@
     {
       "name": "game",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["vite", "--port", "5173", "--strictPort"],
+      "runtimeArgs": [
+        "vite",
+        "--port",
+        "5173",
+        "--strictPort"
+      ],
       "port": 5173
     },
     {
       "name": "asset-viewer",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["tools/serve.mjs", "5180"],
+      "runtimeArgs": [
+        "tools/serve.mjs",
+        "5180"
+      ],
       "port": 5180
+    },
+    {
+      "name": "worker",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "wrangler",
+        "dev",
+        "--port",
+        "8787"
+      ],
+      "port": 8787
     }
   ]
 }

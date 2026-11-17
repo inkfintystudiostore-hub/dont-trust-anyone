@@ -242,7 +242,7 @@ function predictGuestTrapsLocal(g, playerIndex, dt) {
     const t = g.traps[i];
     switch (t.kind) {
       case 'fallingFloor':
-        if (t.state === 'idle' && standingOn(p, t.cx, t.cy)) {
+        if (t.state === 'idle' && (standingOn(p, t.cx, t.cy) || (t.near > 0 && Math.abs(p.x - (t.cx + 0.5)) < t.near && p.y >= t.cy + 0.9 && p.y < t.cy + 4))) {
           t.state = 'shaking';
           t.timer = t.delay;
         } else if (t.state === 'shaking' && (t.timer -= dt) <= 0) {
@@ -289,6 +289,10 @@ function predictGuestTrapsLocal(g, playerIndex, dt) {
         if (!t.active && p.jumped && Math.abs(p.x - (t.cx + 0.5)) < t.radius && Math.abs(p.y - t.cy) < 3) {
           t.active = true;
         }
+        break;
+      case 'icicle': case 'closingWall': case 'risingFloor': case 'saw': case 'sizeSwell': case 'spikeSwap':
+        t.prevX = t.x; t.prevY = t.y;
+        updateDevilTrap(g, t, i, dt, false, playerIndex);
         break;
       case 'plateA':
       case 'plateB':
@@ -1296,9 +1300,29 @@ function updateTraps(g, dt) {
         }
         break;
       }
+      case 'icicle': case 'closingWall': case 'risingFloor': case 'saw': case 'sizeSwell': case 'spikeSwap':
+        updateDevilTrap(g, t, i, dt, true);
+        break;
+      default: break;
+    }
+  }
+}
+
+const NOOP = () => {};
+/**
+ * Level Devil trap set (icicle, closing wall, rising floor, saw, size swell, spike-swap).
+ * auth = true on the host / solo (full rules). auth = false is guest prediction: only player `only`
+ * triggers, nobody dies and no events fire, the host snapshot stays the judge.
+ */
+function updateDevilTrap(g, t, i, dt, auth, only = -1) {
+  const players = g.players;
+  const emitT = auth ? emit : NOOP;
+  const dieT = auth ? die : NOOP;
+  switch (t.kind) {
       case 'icicle': {
         if (t.state === 'idle') {
           for (let pi = 0; pi < players.length; pi++) {
+            if (only >= 0 && pi !== only) continue;
             const p = players[pi];
             if (!p.atDoor && Math.abs(p.x - (t.cx + 0.5)) < t.radius && p.y < t.cy && p.y > t.cy - 9) {
               t.state = 'armed'; t.timer = t.delay;
@@ -1307,15 +1331,16 @@ function updateTraps(g, dt) {
             }
           }
         } else if (t.state === 'armed') {
-          if ((t.timer -= dt) <= 0) { t.state = 'falling'; emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 }); }
+          if ((t.timer -= dt) <= 0) { t.state = 'falling'; emitT(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 }); }
         } else if (t.state === 'falling') {
           t.vy = Math.max(-PHYS.maxFall, t.vy - PHYS.gravity * dt);
           t.offsetY += t.vy * dt;
           const tipY = t.cy + t.offsetY;
           if (tipY < PIT_Y || isSolid(g, t.cx, Math.floor(tipY))) { t.state = 'done'; break; }
           for (let pi = 0; pi < players.length; pi++) {
+            if (only >= 0 && pi !== only) continue;
             const p = players[pi];
-            if (!p.atDoor && overlaps(p, t.cx + 0.3, tipY, t.cx + 0.7, tipY + 0.9)) die(g, 'icicle', i, pi);
+            if (!p.atDoor && overlaps(p, t.cx + 0.3, tipY, t.cx + 0.7, tipY + 0.9)) dieT(g, 'icicle', i, pi);
           }
         }
         break;
@@ -1323,6 +1348,7 @@ function updateTraps(g, dt) {
       case 'closingWall': {
         if (t.state === 'idle') {
           for (let pi = 0; pi < players.length; pi++) {
+            if (only >= 0 && pi !== only) continue;
             const p = players[pi];
             const line = t.cx + 0.5 + t.dx;
             // fires when a player crosses the trigger line in either direction
@@ -1335,10 +1361,11 @@ function updateTraps(g, dt) {
         } else if (t.state === 'closing' && (t.timer -= dt) <= 0) {
           t.state = 'closed';
           g.solid[t.cell] = 1;
-          emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 });
+          emitT(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 });
           for (let pi = 0; pi < players.length; pi++) {
+            if (only >= 0 && pi !== only) continue;
             const p = players[pi];
-            if (!p.atDoor && overlaps(p, t.cx + 0.05, t.cy, t.cx + 0.95, t.cy + 1)) die(g, 'crushed', i, pi);
+            if (!p.atDoor && overlaps(p, t.cx + 0.05, t.cy, t.cx + 0.95, t.cy + 1)) dieT(g, 'crushed', i, pi);
           }
         }
         break;
@@ -1346,6 +1373,7 @@ function updateTraps(g, dt) {
       case 'risingFloor': {
         if (t.state === 'idle') {
           for (let pi = 0; pi < players.length; pi++) {
+            if (only >= 0 && pi !== only) continue;
             if (!standingOn(players[pi], t.cx, t.cy)) continue;
             // the whole contiguous strip in this row rises together
             for (const o of g.traps) {
@@ -1354,7 +1382,7 @@ function updateTraps(g, dt) {
               }
             }
             g.lastTrapIndex = i; g.lastTrapTime = g.time;
-            emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 });
+            emitT(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 });
             break;
           }
         } else if (t.state === 'armed') {
@@ -1372,6 +1400,7 @@ function updateTraps(g, dt) {
             t.offsetY = to - t.cy;
             t.timer += 1 / t.speed;
             for (let pi = 0; pi < players.length; pi++) {
+            if (only >= 0 && pi !== only) continue;
               const p = players[pi];
               if (p.atDoor || p.gravDir < 0) continue;
               if (p.x + hw(p) > t.cx && p.x - hw(p) < t.cx + 1 && p.y >= from + 0.9 && p.y <= to + 0.1) {
@@ -1380,7 +1409,7 @@ function updateTraps(g, dt) {
                 p.onGround = true;
                 const head = Math.floor(p.y + ht(p) - 1e-4);
                 for (let cx = Math.floor(p.x - hw(p) + 1e-4); cx <= Math.floor(p.x + hw(p) - 1e-4); cx++) {
-                  if (isSolid(g, cx, head)) { die(g, 'crushed', i, pi); break; }
+                  if (isSolid(g, cx, head)) { dieT(g, 'crushed', i, pi); break; }
                 }
               }
             }
@@ -1391,10 +1420,11 @@ function updateTraps(g, dt) {
       case 'saw': {
         if (t.popup > 0 && t.state === 'idle') {
           for (let pi = 0; pi < players.length; pi++) {
+            if (only >= 0 && pi !== only) continue;
             const p = players[pi];
             if (!p.atDoor && Math.abs(p.x - t.x) < t.popup && Math.abs(p.y - t.cy) < 3) {
               t.state = 'moving'; t.vx = t.dir * t.speed;
-              emit(g, 'trap', { kind: t.kind, x: t.x, y: t.y });
+              emitT(g, 'trap', { kind: t.kind, x: t.x, y: t.y });
               break;
             }
           }
@@ -1411,14 +1441,16 @@ function updateTraps(g, dt) {
           if (t.axis === 'y') t.y = next; else t.x = next;
         }
         for (let pi = 0; pi < players.length; pi++) {
+            if (only >= 0 && pi !== only) continue;
           const p = players[pi];
-          if (!p.atDoor && overlaps(p, t.x - 0.36, t.y + 0.1, t.x + 0.36, t.y + 0.82)) die(g, 'saw', i, pi);
+          if (!p.atDoor && overlaps(p, t.x - 0.36, t.y + 0.1, t.x + 0.36, t.y + 0.82)) dieT(g, 'saw', i, pi);
         }
         break;
       }
       case 'sizeSwell': {
         if (!t.triggered) {
           for (let pi = 0; pi < players.length; pi++) {
+            if (only >= 0 && pi !== only) continue;
             const p = players[pi];
             if (!p.atDoor && overlaps(p, t.cx + 0.1, t.cy, t.cx + 0.9, t.cy + 0.6)) {
               t.triggered = true;
@@ -1429,7 +1461,7 @@ function updateTraps(g, dt) {
               p.trapAnim = 'swell';
               p.trapAnimTimer = 0.5;
               g.lastTrapIndex = i; g.lastTrapTime = g.time;
-              emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.3, playerIndex: pi });
+              emitT(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.3, playerIndex: pi });
               break;
             }
           }
@@ -1438,6 +1470,7 @@ function updateTraps(g, dt) {
       }
       case 'spikeSwap': {
         for (let pi = 0; pi < players.length; pi++) {
+            if (only >= 0 && pi !== only) continue;
           const p = players[pi];
           const bit = 1 << pi;
           const inZone = !p.atDoor && overlaps(p, t.cx + 0.12, t.cy, t.cx + 0.88, t.cy + 0.5);
@@ -1446,7 +1479,7 @@ function updateTraps(g, dt) {
             if (t.step > t.after && !t.active) {
               t.active = true;
               g.lastTrapIndex = i; g.lastTrapTime = g.time;
-              emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 });
+              emitT(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 });
             }
           }
           if (inZone) t.insideMask |= bit;
@@ -1455,7 +1488,6 @@ function updateTraps(g, dt) {
         break;
       }
       default: break;
-    }
   }
 }
 
@@ -1540,6 +1572,7 @@ export function exportCoopSnapshot(g, meta = null) {
       if (!active) return acc;
       acc.push({
         i,
+        kind: t.kind,
         state: t.state, offsetY: t.offsetY, x: t.x, y: t.y, ext: t.ext, vx: t.vx,
         face: t.face, shy: t.shy, onGround: t.onGround, revealed: t.revealed,
         active: t.active, triggered: t.triggered, collected: t.collected, pressed: t.pressed,
@@ -1556,6 +1589,15 @@ export function exportCoopSnapshot(g, meta = null) {
   return snap;
 }
 
+// trap states that only ever move forward within one attempt (guest prediction may be ahead of the host)
+const ONE_WAY = {
+  fallingFloor: ['idle', 'shaking', 'falling'],
+  launchFloor: ['idle', 'shaking', 'launching'],
+  icicle: ['idle', 'armed', 'falling', 'done'],
+  closingWall: ['idle', 'closing', 'closed'],
+  risingFloor: ['idle', 'armed', 'rising', 'up'],
+};
+
 /** Applies a Host snapshot onto the Guest simulation state without discarding smooth interpolation anchors. */
 export function applyCoopSnapshot(g, snap, opts = null) {
   if (!snap) return { levelChanged: false, respawned: false };
@@ -1564,6 +1606,9 @@ export function applyCoopSnapshot(g, snap, opts = null) {
   const prevTime = g.time;
   if (levelChanged) loadLevel(g, snap.levelIndex);
   const respawned = levelChanged || (wasDead && !snap.dead) || (snap.time < 0.25 && prevTime > 0.35);
+  // Snapshots only list traps that are active, so after a respawn the guest must reset the level
+  // itself, otherwise fallen floors, closed walls and popped spikes from the last attempt stay.
+  if (respawned && !levelChanged) resetLevel(g);
   g.time = snap.time;
   g.darkTimer = snap.darkTimer;
   if (snap.keysLeft !== undefined) g.keysLeft = snap.keysLeft;
@@ -1644,6 +1689,12 @@ export function applyCoopSnapshot(g, snap, opts = null) {
       const ti = Number.isInteger(src?.i) ? src.i : idx;
       const dst = g.traps[ti];
       if (!dst || !src) continue;
+      // one-way traps the guest already set off itself: an older host view must not undo them
+      // (a floor reappearing under the guest, a wall reopening), the host catches up a moment later
+      const order = ONE_WAY[dst.kind];
+      if (!respawned && order && order.indexOf(src.state) < order.indexOf(dst.state)) continue;
+      // the saw is simulated on the guest too; only take the host position if it drifted
+      if (!respawned && dst.kind === 'saw' && dst.state === src.state && Math.abs(src.x - dst.x) + Math.abs(src.y - dst.y) < 1) continue;
       const teleported = respawned || (src.x !== undefined && Math.hypot(src.x - dst.x, (src.y ?? dst.y) - dst.y) > 2.5);
       const anchorX = teleported ? (src.x ?? dst.x) : dst.x;
       const anchorY = teleported ? (src.y ?? dst.y) : dst.y;

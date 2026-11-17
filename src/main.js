@@ -318,8 +318,10 @@ const lobby = createCoopLobby(LEVELS, {
     if (levelChanged) {
       snapBuffer.reset();
       snapBuffer.push(snap, time);
-      rebuildWorld();
-      showLevel();
+      const need = modelsForLevel(game.level);
+      const rebuild = () => { rebuildWorld(); showLevel(); };
+      if (modelStore.hasAll(need)) rebuild();
+      else modelStore.ensure(need).catch(() => {}).then(rebuild);
     } else if (respawned) {
       snapBuffer.reset();
       snapBuffer.push(snap, time);
@@ -941,9 +943,12 @@ function onEvent(e) {
       }
       transitioning = true;
       hud.iris(() => {
-        transitioning = false;
-        rebuildWorld();
-        showLevel();
+        // the next level may need models that are still downloading (slow guest phones)
+        modelStore.ensure(modelsForLevel(game.level)).catch(() => {}).then(() => {
+          transitioning = false;
+          rebuildWorld();
+          showLevel();
+        });
       }, reducedMotion);
       break;
     }
