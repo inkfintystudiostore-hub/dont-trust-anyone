@@ -100,7 +100,7 @@ const MODEL_HEIGHTS = {
   gift_box: 0.9, toy_robot: 0.95, cute_ghost: 0.95,
   coop_switch: 0.45, golden_key: 0.28, ticking_bomb: 0.85,
   spring_pad: 0.65, magnet_orb: 0.8, pie_cannon: 0.85,
-  portal_gate: 1.5, countdown_speaker: 0.75,
+  portal_gate: 1.5, countdown_speaker: 0.75, saw_blade: 0.9,
 };
 const CORE_MODELS = ['momo', 'mimi', 'darwaza', 'gappu_sign', 'kabootar', 'lollipop_tree', 'cotton_cloud', 'boulder'];
 const TRAP_MODEL = {
@@ -121,6 +121,7 @@ const TRAP_MODEL = {
   pieCannon: 'pie_cannon',
   portalWall: 'portal_gate',
   countdownLie: 'countdown_speaker',
+  saw: 'saw_blade',
 };
 function modelsForLevel(level) {
   const needed = new Set(CORE_MODELS);

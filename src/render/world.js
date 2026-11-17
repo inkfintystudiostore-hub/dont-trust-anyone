@@ -28,7 +28,6 @@ const GEO = {
   backdrop: new PlaneGeometry(1, 1),
   shadowDisc: new CircleGeometry(0.42, 20),
   signLabel: new PlaneGeometry(1.52, 0.68),
-  icicle: new ConeGeometry(0.2, 0.75, 10),
   saw: new CylinderGeometry(0.44, 0.44, 0.12, 14),
 };
 
@@ -186,9 +185,12 @@ export function buildWorld(scene, level, models) {
 
   // static ground (instanced)
   const solids = [], tops = [], spikes = [];
+  // floor-like trap blocks count as covering the tile below, so no grass seam gives them away
+  const FLOOR_TRAPS = new Set(['fallingFloor', 'launchFloor', 'antiJump', 'conveyor', 'slowFloor', 'springTrap', 'discoFloor', 'weightBridge', 'shyPlatform', 'hungryFloor', 'risingFloor']);
+  const coveredByTrap = new Set(level.trapDefs.filter((d) => FLOOR_TRAPS.has(d.kind)).map((d) => d.cell));
   for (let cy = 0; cy < H; cy++) for (let cx = 0; cx < W; cx++) {
     const tile = tiles[cy * W + cx];
-    if (tile === TILE.SOLID) { solids.push([cx, cy]); if (!isSolidTile(cx, cy + 1)) tops.push([cx, cy]); }
+    if (tile === TILE.SOLID) { solids.push([cx, cy]); if (!isSolidTile(cx, cy + 1) && !coveredByTrap.has((cy + 1) * W + cx)) tops.push([cx, cy]); }
     if (tile === TILE.SPIKES) spikes.push([cx, cy, isSolidTile(cx, cy + 1) && !isSolidTile(cx, cy - 1)]);
   }
   root.add(instanced(GEO.block, theme.dirt, solids, (cx, cy) => { dummy.rotation.set(0, 0, 0); dummy.position.set(cx + 0.5, cy + 0.5, 0); }));
@@ -531,11 +533,14 @@ export function buildWorld(scene, level, models) {
       v.position.set(d.cx + 0.5, d.cy, 0);
     } else if (d.kind === 'icicle') {
       // looks exactly like a static ceiling spike until it drops
+      // identical to the instanced static ceiling spikes (same cones, same spots): never telegraphed
       v = new Group();
-      const body = models.candy_icicle ? models.candy_icicle.clone(true) : new Mesh(GEO.icicle, MAT.spike);
-      body.rotation.x = Math.PI;
-      body.position.y = models.candy_icicle ? 1 : 0.6;
-      v.add(body);
+      for (const x of SPIKE_X) for (const z of SPIKE_Z) {
+        const s = new Mesh(GEO.spike, MAT.spike);
+        s.rotation.x = Math.PI;
+        s.position.set(x - 0.5, 0.75, z);
+        v.add(s);
+      }
       v.position.set(d.cx + 0.5, d.cy, 0);
     } else if (d.kind === 'closingWall') {
       v = new Group();
@@ -551,9 +556,18 @@ export function buildWorld(scene, level, models) {
       v.position.set(d.cx + 0.5, d.cy + 0.5, 0);
     } else if (d.kind === 'saw') {
       v = new Group();
-      const blade = models.saw_blade ? models.saw_blade.clone(true) : new Mesh(GEO.saw, MAT.saw);
-      if (!models.saw_blade) blade.rotation.x = Math.PI / 2;
-      blade.position.y = models.saw_blade ? 0 : 0.46;
+      // spin pivot at the blade centre (loaded models have their origin at the bottom)
+      const blade = new Group();
+      if (models.saw_blade) {
+        const m = models.saw_blade.clone(true);
+        m.position.y = -0.45;
+        blade.add(m);
+      } else {
+        const m = new Mesh(GEO.saw, MAT.saw);
+        m.rotation.x = Math.PI / 2;
+        blade.add(m);
+      }
+      blade.position.y = 0.46;
       v.userData.blade = blade;
       v.add(blade);
       v.position.set(d.cx + 0.5, d.cy, 0);
