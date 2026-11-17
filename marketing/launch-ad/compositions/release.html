@@ -1,0 +1,35 @@
+<template>
+  <style>
+  #root { position: absolute; inset: 0; overflow: hidden; font-family: 'Outfit', sans-serif; color: #1f1916; }
+  .cam { position: absolute; inset: 0; transform-origin: 50% 58%; }
+  .cam video, .cam img { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; object-fit: cover; }
+  .ttl { position: absolute; z-index: 3; left: 90px; right: 90px; display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
+  .ln { display: inline-block; background: #fffbf7; border: 3px solid #eadad0; border-radius: 40px; padding: 14px 34px 20px;
+        font-weight: 900; letter-spacing: -0.02em; line-height: 0.98; box-shadow: 0 12px 0 rgba(31,25,22,.18); }
+  .ln.ink { background: #1f1916; border-color: #1f1916; color: #fffbf7; }
+  .w { display: inline-block; white-space: pre; }
+  .acc { color: #8b0d1a; }
+  .ln.ink .acc { color: #ff9fb0; }
+  .pillsm { display: inline-block; background: #fffbf7; border: 3px solid #eadad0; border-radius: 999px; padding: 12px 30px 15px;
+            font-weight: 800; font-size: 50px; letter-spacing: -0.01em; box-shadow: 0 8px 0 rgba(31,25,22,.16); }
+
+    #root { background: transparent; }
+  </style>
+  <div id="root" data-composition-id="release" data-width="1080" data-height="1920" data-duration="2">
+    <div class="cam" id="release-cam-c36_release"><video id="release-v-c36_release" class="clip" data-start="0" data-duration="2" data-media-start="0.433" src="assets/footage/c36_release.mp4" muted playsinline></video></div>
+    <div id="release-a" class="ttl clip" data-start="0.08" data-duration="1.9" style="top:455px"><div class="ln" id="release-a-l0" style="font-size:104px"><span class="w" id="release-a-w0-0">Bas </span><span class="w" id="release-a-w0-1">1 </span><span class="w" id="release-a-w0-2">second</span></div><div class="ln" id="release-a-l1" style="font-size:104px"><span class="w acc" id="release-a-w1-0">ruk </span><span class="w" id="release-a-w1-1">na…</span></div></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+tl.set('#release-cam-c36_release', {scale:1}, 0);
+tl.to('#release-cam-c36_release', {scale:1.11, duration:0.07, ease:'power2.out'}, 1.4).to('#release-cam-c36_release', {scale:1.05, duration:0.35, ease:'power3.out'});
+tl.fromTo("#release-a-l0,#release-a-l1", {scale:0.7, opacity:0}, {scale:1, opacity:1, duration:0.22, ease:'back.out(2.2)', stagger:0.12}, 0.08);
+tl.fromTo('#release-a-w0-0', {opacity:0, filter:'blur(8px)'}, {opacity:1, filter:'blur(0px)', duration:0.13, ease:'power4.out'}, 0.08);
+tl.fromTo('#release-a-w0-1', {opacity:0, filter:'blur(8px)'}, {opacity:1, filter:'blur(0px)', duration:0.13, ease:'power4.out'}, 0.14);
+tl.fromTo('#release-a-w0-2', {opacity:0, filter:'blur(8px)'}, {opacity:1, filter:'blur(0px)', duration:0.13, ease:'power4.out'}, 0.2);
+tl.fromTo('#release-a-w1-0', {opacity:0, filter:'blur(8px)'}, {opacity:1, filter:'blur(0px)', duration:0.13, ease:'power4.out'}, 0.2);
+tl.fromTo('#release-a-w1-1', {opacity:0, filter:'blur(8px)'}, {opacity:1, filter:'blur(0px)', duration:0.13, ease:'power4.out'}, 0.26);
+tl.to("#release-a-l0,#release-a-l1", {opacity:0, filter:'blur(6px)', duration:0.12, ease:'power2.in'}, 1.85);
+    window.__timelines["release"] = tl;
+  </script>
+</template>

@@ -1,0 +1,30 @@
+<template>
+  <style>
+  #root { position: absolute; inset: 0; overflow: hidden; font-family: 'Outfit', sans-serif; color: #1f1916; }
+  .cam { position: absolute; inset: 0; transform-origin: 50% 58%; }
+  .cam video, .cam img { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; object-fit: cover; }
+  .ttl { position: absolute; z-index: 3; left: 90px; right: 90px; display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
+  .ln { display: inline-block; background: #fffbf7; border: 3px solid #eadad0; border-radius: 40px; padding: 14px 34px 20px;
+        font-weight: 900; letter-spacing: -0.02em; line-height: 0.98; box-shadow: 0 12px 0 rgba(31,25,22,.18); }
+  .ln.ink { background: #1f1916; border-color: #1f1916; color: #fffbf7; }
+  .w { display: inline-block; white-space: pre; }
+  .acc { color: #8b0d1a; }
+  .ln.ink .acc { color: #ff9fb0; }
+  .pillsm { display: inline-block; background: #fffbf7; border: 3px solid #eadad0; border-radius: 999px; padding: 12px 30px 15px;
+            font-weight: 800; font-size: 50px; letter-spacing: -0.01em; box-shadow: 0 8px 0 rgba(31,25,22,.16); }
+
+    #root { background: #8b0d1a; }
+  </style>
+  <div id="root" data-composition-id="galti" data-width="1080" data-height="1920" data-duration="1.5">
+    <div id="galti-card" class="cam" style="transform-origin:50% 50%"><img id="galti-img" class="clip" data-start="0" data-duration="1.5" src="assets/still_c41.jpg"></div>
+    <div id="galti-t" class="ttl clip" data-start="0.3" data-duration="1.2" style="top:300px"><div class="ln" id="galti-t-l0" style="font-size:124px"><span class="w" id="galti-t-w0-0">Galti </span><span class="w" id="galti-t-w0-1">uski.</span></div><div class="ln" id="galti-t-l1" style="font-size:124px"><span class="w" id="galti-t-w1-0">Maut </span><span class="w acc" id="galti-t-w1-1">DONO </span><span class="w" id="galti-t-w1-2">ki.</span></div></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+tl.fromTo('#galti-card', {scale:1, rotation:0, y:0}, {scale:0.56, rotation:-4, y:330, duration:0.42, ease:'power3.inOut'}, 0);
+tl.fromTo('#galti-img', {borderRadius:0, outline:'0px solid #fffbf7'}, {borderRadius:36, outline:'22px solid #fffbf7', duration:0.42, ease:'power3.inOut'}, 0);
+tl.fromTo("#galti-t-l0,#galti-t-l1", {scale:1.35, opacity:0}, {scale:1, opacity:1, duration:0.18, ease:'expo.out', stagger:0.1}, 0.3);
+tl.to("#galti-t-l0,#galti-t-l1", {opacity:0, filter:'blur(6px)', duration:0.12, ease:'power2.in'}, 1.37);
+    window.__timelines["galti"] = tl;
+  </script>
+</template>

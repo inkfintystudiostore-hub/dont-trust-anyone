@@ -1,0 +1,39 @@
+<template>
+  <style>
+  #root { position: absolute; inset: 0; overflow: hidden; font-family: 'Outfit', sans-serif; color: #1f1916; }
+  .cam { position: absolute; inset: 0; transform-origin: 50% 58%; }
+  .cam video, .cam img { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; object-fit: cover; }
+  .ttl { position: absolute; z-index: 3; left: 90px; right: 90px; display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
+  .ln { display: inline-block; background: #fffbf7; border: 3px solid #eadad0; border-radius: 40px; padding: 14px 34px 20px;
+        font-weight: 900; letter-spacing: -0.02em; line-height: 0.98; box-shadow: 0 12px 0 rgba(31,25,22,.18); }
+  .ln.ink { background: #1f1916; border-color: #1f1916; color: #fffbf7; }
+  .w { display: inline-block; white-space: pre; }
+  .acc { color: #8b0d1a; }
+  .ln.ink .acc { color: #ff9fb0; }
+  .pillsm { display: inline-block; background: #fffbf7; border: 3px solid #eadad0; border-radius: 999px; padding: 12px 30px 15px;
+            font-weight: 800; font-size: 50px; letter-spacing: -0.01em; box-shadow: 0 8px 0 rgba(31,25,22,.16); }
+
+    #root { background: transparent; }
+  </style>
+  <div id="root" data-composition-id="slams" data-width="1080" data-height="1920" data-duration="3">
+    <div id="slam-bg0" class="clip" data-start="0" data-duration="0.8" style="position:absolute;inset:0;background:#fffbf7"></div>
+    <div id="slam-t0" class="ttl clip" data-start="0" data-duration="0.8" style="top:640px"><div class="ln" id="slam-t0-l0" style="font-size:136px"><span class="w acc" id="slam-t0-w0-0">Floor</span></div><div class="ln" id="slam-t0-l1" style="font-size:136px"><span class="w" id="slam-t0-w1-0">jhooth </span><span class="w" id="slam-t0-w1-1">bolta </span><span class="w" id="slam-t0-w1-2">hai.</span></div></div>
+    <div id="slam-bg1" class="clip" data-start="0.8" data-duration="0.45" style="position:absolute;inset:0;background:#1f1916"></div>
+    <div id="slam-t1" class="ttl clip" data-start="0.8" data-duration="0.45" style="top:640px"><div class="ln ink" id="slam-t1-l0" style="font-size:136px"><span class="w acc" id="slam-t1-w0-0">Sign </span><span class="w" id="slam-t1-w0-1">bhi.</span></div></div>
+    <div id="slam-bg2" class="clip" data-start="1.25" data-duration="0.5" style="position:absolute;inset:0;background:#fffbf7"></div>
+    <div id="slam-t2" class="ttl clip" data-start="1.25" data-duration="0.5" style="top:640px"><div class="ln" id="slam-t2-l0" style="font-size:136px"><span class="w acc" id="slam-t2-w0-0">Darwaza </span><span class="w" id="slam-t2-w0-1">bhi.</span></div></div>
+    <div id="slam-bg3" class="clip" data-start="1.75" data-duration="0.55" style="position:absolute;inset:0;background:#8b0d1a"></div>
+    <div id="slam-t3" class="ttl clip" data-start="1.75" data-duration="0.55" style="top:640px"><div class="ln ink" id="slam-t3-l0" style="font-size:136px"><span class="w" id="slam-t3-w0-0">Aur </span><span class="w acc" id="slam-t3-w0-1">DOST?</span></div></div>
+    <div id="slam-bg4" class="clip" data-start="2.3" data-duration="0.7" style="position:absolute;inset:0;background:#1f1916"></div>
+    <div id="slam-t4" class="ttl clip" data-start="2.3" data-duration="0.7" style="top:640px"><div class="ln ink" id="slam-t4-l0" style="font-size:136px"><span class="w" id="slam-t4-w0-0">Sabse</span></div><div class="ln ink" id="slam-t4-l1" style="font-size:136px"><span class="w acc" id="slam-t4-w1-0">pehle.</span></div></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+tl.fromTo("#slam-t0-l0,#slam-t0-l1", {scale:1.35, opacity:0}, {scale:1, opacity:1, duration:0.18, ease:'expo.out', stagger:0.1}, 0);
+tl.fromTo("#slam-t1-l0", {scale:1.35, opacity:0}, {scale:1, opacity:1, duration:0.18, ease:'expo.out', stagger:0.1}, 0.8);
+tl.fromTo("#slam-t2-l0", {scale:1.35, opacity:0}, {scale:1, opacity:1, duration:0.18, ease:'expo.out', stagger:0.1}, 1.25);
+tl.fromTo("#slam-t3-l0", {scale:1.35, opacity:0}, {scale:1, opacity:1, duration:0.18, ease:'expo.out', stagger:0.1}, 1.75);
+tl.fromTo("#slam-t4-l0,#slam-t4-l1", {scale:1.35, opacity:0}, {scale:1, opacity:1, duration:0.18, ease:'expo.out', stagger:0.1}, 2.3);
+    window.__timelines["slams"] = tl;
+  </script>
+</template>

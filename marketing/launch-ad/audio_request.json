@@ -1,0 +1,14 @@
+{ "lines": [
+  { "id": "bonk", "text": "", "sfx": ["cartoon bonk", "cartoon boing"] },
+  { "id": "scratch", "text": "", "sfx": ["record scratch"] },
+  { "id": "boom", "text": "", "sfx": ["cartoon explosion"] },
+  { "id": "zap", "text": "", "sfx": ["electric zap"] },
+  { "id": "slip", "text": "", "sfx": ["slide whistle down"] },
+  { "id": "coin", "text": "", "sfx": ["coin pickup"] },
+  { "id": "party", "text": "", "sfx": ["party horn"] },
+  { "id": "hit", "text": "", "sfx": ["bass impact", "punch hit"] },
+  { "id": "ui", "text": "", "sfx": ["ui click", "notification pop"] },
+  { "id": "whoosh", "text": "", "sfx": ["whoosh"] },
+  { "id": "ghost", "text": "", "sfx": ["cartoon ghost"] },
+  { "id": "spring", "text": "", "sfx": ["cartoon spring"] }
+], "bgm": { "mode": "none" } }

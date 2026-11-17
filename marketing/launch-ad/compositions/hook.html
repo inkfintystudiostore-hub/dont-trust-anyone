@@ -1,0 +1,31 @@
+<template>
+  <style>
+  #root { position: absolute; inset: 0; overflow: hidden; font-family: 'Outfit', sans-serif; color: #1f1916; }
+  .cam { position: absolute; inset: 0; transform-origin: 50% 58%; }
+  .cam video, .cam img { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; object-fit: cover; }
+  .ttl { position: absolute; z-index: 3; left: 90px; right: 90px; display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
+  .ln { display: inline-block; background: #fffbf7; border: 3px solid #eadad0; border-radius: 40px; padding: 14px 34px 20px;
+        font-weight: 900; letter-spacing: -0.02em; line-height: 0.98; box-shadow: 0 12px 0 rgba(31,25,22,.18); }
+  .ln.ink { background: #1f1916; border-color: #1f1916; color: #fffbf7; }
+  .w { display: inline-block; white-space: pre; }
+  .acc { color: #8b0d1a; }
+  .ln.ink .acc { color: #ff9fb0; }
+  .pillsm { display: inline-block; background: #fffbf7; border: 3px solid #eadad0; border-radius: 999px; padding: 12px 30px 15px;
+            font-weight: 800; font-size: 50px; letter-spacing: -0.01em; box-shadow: 0 8px 0 rgba(31,25,22,.16); }
+
+    #root { background: transparent; }
+  </style>
+  <div id="root" data-composition-id="hook" data-width="1080" data-height="1920" data-duration="2.9">
+    <div class="cam" id="hook-cam-c37_bomb"><video id="hook-v-c37_bomb" class="clip" data-start="0" data-duration="2.9" data-media-start="0.5" src="assets/footage/c37_bomb.mp4" muted playsinline></video></div>
+    <div id="hook-a" class="ttl clip" data-start="0" data-duration="1.72" style="top:455px"><div class="ln" id="hook-a-l0" style="font-size:100px"><span class="w" id="hook-a-w0-0">Ye </span><span class="w" id="hook-a-w0-1">game</span></div><div class="ln" id="hook-a-l1" style="font-size:100px"><span class="w acc" id="hook-a-w1-0">dost </span><span class="w" id="hook-a-w1-1">ke </span><span class="w" id="hook-a-w1-2">saath</span></div><div class="ln" id="hook-a-l2" style="font-size:100px"><span class="w" id="hook-a-w2-0">mat </span><span class="w" id="hook-a-w2-1">khelna.</span></div></div>
+    <div id="hook-b" class="ttl clip" data-start="1.72" data-duration="1.18" style="top:455px"><div class="ln" id="hook-b-l0" style="font-size:112px"><span class="w" id="hook-b-w0-0">Ek </span><span class="w" id="hook-b-w0-1">mara </span><span class="w" id="hook-b-w0-2">to</span></div><div class="ln" id="hook-b-l1" style="font-size:112px"><span class="w acc" id="hook-b-w1-0">DONO </span><span class="w" id="hook-b-w1-1">marte </span><span class="w" id="hook-b-w1-2">hain</span></div></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+tl.set('#hook-cam-c37_bomb', {scale:1}, 0);
+tl.to('#hook-cam-c37_bomb', {scale:1.11, duration:0.07, ease:'power2.out'}, 1.7).to('#hook-cam-c37_bomb', {scale:1.05, duration:0.35, ease:'power3.out'});
+tl.to("#hook-a-l0,#hook-a-l1,#hook-a-l2", {opacity:0, filter:'blur(6px)', duration:0.12, ease:'power2.in'}, 1.59);
+tl.fromTo("#hook-b-l0,#hook-b-l1", {scale:1.35, opacity:0}, {scale:1, opacity:1, duration:0.18, ease:'expo.out', stagger:0.1}, 1.72);
+    window.__timelines["hook"] = tl;
+  </script>
+</template>

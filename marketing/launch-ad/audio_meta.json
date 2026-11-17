@@ -1,0 +1,171 @@
+{
+  "tts_provider": null,
+  "voice_id": null,
+  "bgm": null,
+  "bgm_pending": false,
+  "bgm_provider": null,
+  "bgm_pid": null,
+  "bgm_log": null,
+  "bgm_mode": null,
+  "bgm_target_duration_s": null,
+  "bgm_seed_duration_s": null,
+  "bgm_loop_count": null,
+  "voices": [],
+  "sfx": [
+    {
+      "id": "bonk",
+      "name": "cartoon boing",
+      "file": "assets/sfx/cartoon-boing.mp3",
+      "source": "openverse",
+      "duration_s": 2.252,
+      "license": "cc0",
+      "credit": "\"Cartoon Boing.wav\" by reelworldstudio is marked with CC0 1.0. To view the terms, visit https://creativecommons.org/publicdomain/zero/1.0/.",
+      "offset_s": 0,
+      "volume": 0.35
+    },
+    {
+      "id": "scratch",
+      "name": "record scratch",
+      "file": "assets/sfx/record-scratch.mp3",
+      "source": "openverse",
+      "duration_s": 1.876,
+      "license": "cc0",
+      "credit": "\"Record Scratch #4\" by musicvision31 is marked with CC0 1.0. To view the terms, visit https://creativecommons.org/publicdomain/zero/1.0/.",
+      "offset_s": 0,
+      "volume": 0.35
+    },
+    {
+      "id": "boom",
+      "name": "cartoon explosion",
+      "file": "assets/sfx/cartoon-explosion.mp3",
+      "source": "openverse",
+      "duration_s": 1.503,
+      "license": "cc0",
+      "credit": "\"Metal crash.mp3\" by 5plus5equalspatata is marked with CC0 1.0. To view the terms, visit https://creativecommons.org/publicdomain/zero/1.0/.",
+      "offset_s": 0,
+      "volume": 0.35
+    },
+    {
+      "id": "zap",
+      "name": "electric zap",
+      "file": "assets/sfx/electric-zap.mp3",
+      "source": "openverse",
+      "duration_s": 4.907,
+      "license": "cc0",
+      "credit": "\"Electric Zap Loop\" by Resaural is marked with CC0 1.0. To view the terms, visit https://creativecommons.org/publicdomain/zero/1.0/.",
+      "offset_s": 0,
+      "volume": 0.35
+    },
+    {
+      "id": "slip",
+      "name": "slide whistle down",
+      "file": "assets/sfx/slide-whistle-down.mp3",
+      "source": "openverse",
+      "duration_s": 2.469,
+      "license": "by",
+      "credit": "\"Slide Whistle down 01.wav\" by FreqMan is licensed under CC BY 4.0. To view a copy of this license, visit https://creativecommons.org/licenses/by/4.0/.",
+      "offset_s": 0,
+      "volume": 0.35
+    },
+    {
+      "id": "coin",
+      "name": "coin pickup",
+      "file": "assets/sfx/coin-pickup.mp3",
+      "source": "openverse",
+      "duration_s": 0.508,
+      "license": "cc0",
+      "credit": "\"Coin Pickup Sound V 0.2\" by Davidsraba is marked with CC0 1.0. To view the terms, visit https://creativecommons.org/publicdomain/zero/1.0/.",
+      "offset_s": 0,
+      "volume": 0.35
+    },
+    {
+      "id": "party",
+      "name": "party horn",
+      "file": "assets/sfx/party-horn.mp3",
+      "source": "openverse",
+      "duration_s": 2.107,
+      "license": "by",
+      "credit": "\"Party Horn Room 06\" by Lucas_Schacht is licensed under CC BY 4.0. To view a copy of this license, visit https://creativecommons.org/licenses/by/4.0/.",
+      "offset_s": 0,
+      "volume": 0.35
+    },
+    {
+      "id": "hit",
+      "name": "bass impact",
+      "file": "assets/sfx/bass-impact.mp3",
+      "source": "openverse",
+      "duration_s": 3.935,
+      "license": "cc0",
+      "credit": "\"Bass Impact - Ki_01.mp3\" by Kievinay is marked with CC0 1.0. To view the terms, visit https://creativecommons.org/publicdomain/zero/1.0/.",
+      "offset_s": 0,
+      "volume": 0.35
+    },
+    {
+      "id": "hit",
+      "name": "punch hit",
+      "file": "assets/sfx/punch-hit.mp3",
+      "source": "openverse",
+      "duration_s": 1.022,
+      "license": "cc0",
+      "credit": "\"Punch Hit 1.wav\" by joe_anderson22 is marked with CC0 1.0. To view the terms, visit https://creativecommons.org/publicdomain/zero/1.0/.",
+      "offset_s": 0,
+      "volume": 0.35
+    },
+    {
+      "id": "ui",
+      "name": "ui click",
+      "file": "assets/sfx/ui-click.mp3",
+      "source": "openverse",
+      "duration_s": 0.599,
+      "license": "cc0",
+      "credit": "\"UI click\" by Ranner is marked with CC0 1.0. To view the terms, visit https://creativecommons.org/publicdomain/zero/1.0/.",
+      "offset_s": 0,
+      "volume": 0.35
+    },
+    {
+      "id": "ui",
+      "name": "notification pop",
+      "file": "assets/sfx/notification-pop.mp3",
+      "source": "openverse",
+      "duration_s": 0.689,
+      "license": "cc0",
+      "credit": "\"Notification Sound\" by yfjesse is marked with CC0 1.0. To view the terms, visit https://creativecommons.org/publicdomain/zero/1.0/.",
+      "offset_s": 0,
+      "volume": 0.35
+    },
+    {
+      "id": "whoosh",
+      "name": "whoosh",
+      "file": "assets/sfx/whoosh.mp3",
+      "source": "openverse",
+      "duration_s": 3.155,
+      "license": "cc0",
+      "credit": "\"Deep Whoosh #1\" by Kinoton is marked with CC0 1.0. To view the terms, visit https://creativecommons.org/publicdomain/zero/1.0/.",
+      "offset_s": 0,
+      "volume": 0.35
+    },
+    {
+      "id": "ghost",
+      "name": "cartoon ghost",
+      "file": "assets/sfx/cartoon-ghost.mp3",
+      "source": "openverse",
+      "duration_s": 2.13,
+      "license": "cc0",
+      "credit": "\"Danny Phantom Transform\" by plasterbrain is marked with CC0 1.0. To view the terms, visit https://creativecommons.org/publicdomain/zero/1.0/.",
+      "offset_s": 0,
+      "volume": 0.35
+    },
+    {
+      "id": "spring",
+      "name": "cartoon spring",
+      "file": "assets/sfx/cartoon-spring.mp3",
+      "source": "openverse",
+      "duration_s": 0.766,
+      "license": "cc0",
+      "credit": "\"Boing Spring Mouth harp downward 1.wav\" by pan14 is marked with CC0 1.0. To view the terms, visit https://creativecommons.org/publicdomain/zero/1.0/.",
+      "offset_s": 0,
+      "volume": 0.35
+    }
+  ],
+  "total_duration_s": 0
+}

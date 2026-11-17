@@ -1,0 +1,42 @@
+<template>
+  <style>
+  #root { position: absolute; inset: 0; overflow: hidden; font-family: 'Outfit', sans-serif; color: #1f1916; }
+  .cam { position: absolute; inset: 0; transform-origin: 50% 58%; }
+  .cam video, .cam img { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; object-fit: cover; }
+  .ttl { position: absolute; z-index: 3; left: 90px; right: 90px; display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; }
+  .ln { display: inline-block; background: #fffbf7; border: 3px solid #eadad0; border-radius: 40px; padding: 14px 34px 20px;
+        font-weight: 900; letter-spacing: -0.02em; line-height: 0.98; box-shadow: 0 12px 0 rgba(31,25,22,.18); }
+  .ln.ink { background: #1f1916; border-color: #1f1916; color: #fffbf7; }
+  .w { display: inline-block; white-space: pre; }
+  .acc { color: #8b0d1a; }
+  .ln.ink .acc { color: #ff9fb0; }
+  .pillsm { display: inline-block; background: #fffbf7; border: 3px solid #eadad0; border-radius: 999px; padding: 12px 30px 15px;
+            font-weight: 800; font-size: 50px; letter-spacing: -0.01em; box-shadow: 0 8px 0 rgba(31,25,22,.16); }
+
+    #root { background: transparent; }
+  </style>
+  <div id="root" data-composition-id="world" data-width="1080" data-height="1920" data-duration="3.6">
+    <div class="cam" id="world-cam-s12_crusher"><video id="world-v-s12_crusher" class="clip" data-start="0" data-duration="0.55" data-media-start="1.213" src="assets/footage/s12_crusher.mp4" muted playsinline></video></div>
+    <div class="cam" id="world-cam-s14_boulder"><video id="world-v-s14_boulder" class="clip" data-start="0.55" data-duration="0.55" data-media-start="2.013" src="assets/footage/s14_boulder.mp4" muted playsinline></video></div>
+    <div class="cam" id="world-cam-s23_ghostbridge"><video id="world-v-s23_ghostbridge" class="clip" data-start="1.1" data-duration="0.55" data-media-start="1.18" src="assets/footage/s23_ghostbridge.mp4" muted playsinline></video></div>
+    <div class="cam" id="world-cam-s29_bakery"><video id="world-v-s29_bakery" class="clip" data-start="1.65" data-duration="0.55" data-media-start="2.813" src="assets/footage/s29_bakery.mp4" muted playsinline></video></div>
+    <div class="cam" id="world-cam-s33_robot"><video id="world-v-s33_robot" class="clip" data-start="2.2" data-duration="0.55" data-media-start="1.013" src="assets/footage/s33_robot.mp4" muted playsinline></video></div>
+    <div class="cam" id="world-cam-c42_finale"><video id="world-v-c42_finale" class="clip" data-start="2.75" data-duration="0.55" data-media-start="0.98" src="assets/footage/c42_finale.mp4" muted playsinline></video></div>
+    <div id="world-a" class="ttl clip" data-start="0.1" data-duration="3.5" style="top:300px"><div class="ln" id="world-a-l0" style="font-size:132px"><span class="w acc" id="world-a-w0-0">42 </span><span class="w" id="world-a-w0-1">Levels</span></div></div>
+    <div id="world-b" class="ttl clip" data-start="1" data-duration="2.6" style="top:470px"><div class="ln" id="world-b-l0" style="font-size:132px"><span class="w acc" id="world-b-w0-0">5 </span><span class="w" id="world-b-w0-1">Worlds</span></div></div>
+    <div id="world-c" class="ttl clip" data-start="2" data-duration="1.6" style="top:640px"><div class="ln" id="world-c-l0" style="font-size:132px"><span class="w acc" id="world-c-w0-0">0 </span><span class="w" id="world-c-w0-1">Bharosa</span></div></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+tl.set('#world-cam-s12_crusher', {scale:1}, 0);
+tl.set('#world-cam-s14_boulder', {scale:1}, 0);
+tl.set('#world-cam-s23_ghostbridge', {scale:1}, 0);
+tl.set('#world-cam-s29_bakery', {scale:1}, 0);
+tl.set('#world-cam-s33_robot', {scale:1}, 0);
+tl.set('#world-cam-c42_finale', {scale:1}, 0);
+tl.fromTo("#world-a-l0", {scale:1.35, opacity:0}, {scale:1, opacity:1, duration:0.18, ease:'expo.out', stagger:0.1}, 0.1);
+tl.fromTo("#world-b-l0", {scale:1.35, opacity:0}, {scale:1, opacity:1, duration:0.18, ease:'expo.out', stagger:0.1}, 1);
+tl.fromTo("#world-c-l0", {scale:1.35, opacity:0}, {scale:1, opacity:1, duration:0.18, ease:'expo.out', stagger:0.1}, 2);
+    window.__timelines["world"] = tl;
+  </script>
+</template>
