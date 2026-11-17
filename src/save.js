@@ -1,7 +1,9 @@
+import { SKIN_IDS } from './skins.js';
+
 const KEY = 'dta.save.v2';
 
 function defaultSave() {
-  return { unlocked: 0, bestDeaths: {}, totalDeaths: 0, muted: false, assist: false };
+  return { unlocked: 0, bestDeaths: {}, totalDeaths: 0, muted: false, assist: false, skin: 'momo' };
 }
 
 function getStorage(storage) {
@@ -34,6 +36,7 @@ export function loadSave(storage) {
       totalDeaths: Number.isFinite(total) && total >= 0 ? Math.floor(total) : 0,
       muted: !!parsed?.muted,
       assist: !!parsed?.assist,
+      skin: SKIN_IDS.has(parsed?.skin) ? parsed.skin : 'momo',
     };
   } catch {
     return defaultSave();

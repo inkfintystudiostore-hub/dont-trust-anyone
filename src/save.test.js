@@ -10,10 +10,15 @@ function memoryStorage(initial = {}) {
 }
 
 describe('save persistence', () => {
+  it('keeps a known outfit and rejects unknown ones', () => {
+    expect(loadSave(memoryStorage({ 'dta.save.v2': JSON.stringify({ skin: 'fairy' }) })).skin).toBe('fairy');
+    expect(loadSave(memoryStorage({ 'dta.save.v2': JSON.stringify({ skin: '../x' }) })).skin).toBe('momo');
+  });
+
   it('returns clean defaults when storage is missing or corrupt', () => {
-    expect(loadSave(null)).toEqual({ unlocked: 0, bestDeaths: {}, totalDeaths: 0, muted: false, assist: false });
+    expect(loadSave(null)).toEqual({ unlocked: 0, bestDeaths: {}, totalDeaths: 0, muted: false, assist: false, skin: 'momo' });
     const bad = memoryStorage({ 'dta.save.v2': '{broken json' });
-    expect(loadSave(bad)).toEqual({ unlocked: 0, bestDeaths: {}, totalDeaths: 0, muted: false, assist: false });
+    expect(loadSave(bad)).toEqual({ unlocked: 0, bestDeaths: {}, totalDeaths: 0, muted: false, assist: false, skin: 'momo' });
 
     const poisoned = memoryStorage({
       'dta.save.v2': JSON.stringify({
@@ -22,7 +27,7 @@ describe('save persistence', () => {
         bestDeaths: { 0: '<img src=x onerror=alert(1)>', 1: -2, 2: 4 },
       }),
     });
-    expect(loadSave(poisoned)).toEqual({ unlocked: 0, bestDeaths: { 2: 4 }, totalDeaths: 0, muted: false, assist: false });
+    expect(loadSave(poisoned)).toEqual({ unlocked: 0, bestDeaths: { 2: 4 }, totalDeaths: 0, muted: false, assist: false, skin: 'momo' });
 
     const arrBest = memoryStorage({ 'dta.save.v2': JSON.stringify({ bestDeaths: [1, 2] }) });
     expect(loadSave(arrBest).bestDeaths).toEqual({});

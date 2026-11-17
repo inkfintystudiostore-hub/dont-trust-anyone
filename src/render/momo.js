@@ -11,7 +11,7 @@ const damp = (rate, dt) => 1 - Math.exp(-rate * dt);
  * Momo/Mimi = Meshy body + code eyes (blink, wide surprise, velocity lag, sleepy)
  * + dt-independent squash/stretch and hilarious per-trap/death character animations.
  */
-export function createMomo(bodyTemplate) {
+export function createMomo(bodyTemplate, { eyeY: eyeFrac = 0.6 } = {}) {
   const group = new Group();     // world position (feet)
   const flipPivot = new Group(); // flips upside-down around body center when gravDir < 0
   flipPivot.position.y = PHYS.height * 0.5;
@@ -39,7 +39,7 @@ export function createMomo(bodyTemplate) {
     eyes.add(eye);
     eyeList.push(eye);
   }
-  eyes.position.set(0, h * 0.6, frontZ * 0.92);
+  eyes.position.set(0, h * eyeFrac, frontZ * 0.92);
   pivot.add(eyes);
 
   let squash = 0;      // >0 squash (landing), <0 stretch
@@ -218,7 +218,7 @@ export function createMomo(bodyTemplate) {
         eyeList[1].scale.set(1, 1.25, 0.55);
       }
       eyes.position.x = -p.vx * 0.011;
-      eyes.position.y = h * 0.6 - p.vy * 0.004;
+      eyes.position.y = h * eyeFrac - p.vy * 0.004;
     },
   };
 }

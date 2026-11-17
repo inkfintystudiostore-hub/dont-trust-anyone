@@ -88,6 +88,7 @@
       <p class="sub" data-i18n="menu.sub"></p>
       <button id="play" class="btn" data-i18n="menu.solo"></button>
       <button id="open-map" class="btn ghost" data-i18n="menu.map"></button>
+      <button id="open-skins" class="btn ghost">🎭 Outfit chuno</button>
       <button id="open-coop" class="btn ghost" data-i18n="menu.online"></button>
       <p class="keys" data-i18n="menu.keys"></p>
     </div>
@@ -143,6 +144,16 @@
       </div>
       <p id="coop-status" class="coop-status" role="status" aria-live="polite"></p>
       <button id="coop-start" class="btn" type="button" hidden data-i18n="coop.startBtn"></button>
+    </div>
+  </section>
+
+  <section id="skins" class="overlay" role="dialog" aria-modal="true" aria-label="Choose Outfit" hidden>
+    <div class="card skins-card">
+      <div class="map-head">
+        <h2>Outfit chuno</h2>
+        <button id="skins-close" class="pill btn-pill" aria-label="Back">✕</button>
+      </div>
+      <div class="skin-grid" id="skin-grid"></div>
     </div>
   </section>
 

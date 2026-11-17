@@ -7,6 +7,7 @@ import { createGame, loadLevel, restartAttempt, step, stepPlayerLocal, exportCoo
 import { createModelStore } from './render/assets.js';
 import { buildWorld } from './render/world.js';
 import { createMomo } from './render/momo.js';
+import { SKINS, getSkin } from './skins.js';
 import { createConfetti, createDust, createAmbientMotes } from './render/fx.js';
 import { createDiorama } from './render/diorama.js';
 import { input, bindInput, pollGamepad, clearTouchInput } from './input.js';
@@ -101,6 +102,7 @@ const MODEL_HEIGHTS = {
   coop_switch: 0.45, golden_key: 0.28, ticking_bomb: 0.85,
   spring_pad: 0.65, magnet_orb: 0.8, pie_cannon: 0.85,
   portal_gate: 1.5, countdown_speaker: 0.75, saw_blade: 0.9,
+  ...Object.fromEntries(SKINS.filter((k) => k.id !== 'momo').map((k) => [k.id, k.h])),
 };
 const CORE_MODELS = ['momo', 'mimi', 'darwaza', 'gappu_sign', 'kabootar', 'lollipop_tree', 'cotton_cloud', 'boulder'];
 const TRAP_MODEL = {
@@ -124,7 +126,7 @@ const TRAP_MODEL = {
   saw: 'saw_blade',
 };
 function modelsForLevel(level) {
-  const needed = new Set(CORE_MODELS);
+  const needed = new Set([...CORE_MODELS, save.skin]);
   for (let i = 0; i < level.trapDefs.length; i++) {
     const m = TRAP_MODEL[level.trapDefs[i].kind];
     if (m) needed.add(m);
@@ -156,7 +158,7 @@ modelStore.preloadAll().catch(() => {});
 
 let game = createGame(LEVELS, startLevel);
 let world = buildWorld(scene, game.level, models);
-const momo = createMomo(models.momo);
+let momo = createMomo(models[save.skin], { eyeY: getSkin(save.skin).eyeY });
 const mimi = createMomo(models.mimi);
 mimi.group.visible = false;
 const confetti = createConfetti();
@@ -624,6 +626,30 @@ $('open-coop').addEventListener('click', () => {
   lobby.openCreate();
 });
 $('open-map').addEventListener('click', openMap);
+
+// Outfit picker: same faceless body, different costume model. Applies to the Momo seat only.
+function renderSkins() {
+  $('skin-grid').innerHTML = SKINS.map((k) => `<button type="button" class="skin-btn${k.id === save.skin ? ' on' : ''}" data-skin="${k.id}" aria-pressed="${k.id === save.skin}"><img src="${import.meta.env.BASE_URL}skins/${k.id}.webp" alt="" width="120" height="120" loading="lazy"><span>${k.name}</span><small>${k.tag}</small></button>`).join('');
+}
+async function setSkin(id) {
+  const k = getSkin(id);
+  await modelStore.ensure([k.id]);
+  const old = momo;
+  momo = createMomo(models[k.id], { eyeY: k.eyeY });
+  momo.group.visible = old.group.visible;
+  scene.add(momo.group);
+  scene.remove(old.group);
+  momo.reset();
+  save = { ...save, skin: k.id };
+  saveProgress(save);
+  renderSkins();
+}
+$('open-skins').addEventListener('click', () => { renderSkins(); $('skins').hidden = false; });
+$('skins-close').addEventListener('click', () => { $('skins').hidden = true; $('open-skins').focus(); });
+$('skin-grid').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-skin]');
+  if (b) setSkin(b.dataset.skin).catch(() => hud.toast('Outfit load nahi hua, dobara try karo', 1500));
+});
 $('end-map').addEventListener('click', openMap);
 $('btn-map').addEventListener('click', openMap);
 $('btn-chat').addEventListener('click', () => {
