@@ -7,10 +7,33 @@ const ICO_FS_EXIT = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><pa
 let tauntTimer = 0;
 let toastTimer = 0;
 let irisTimer = 0;
+let lastFlipped = null;
+let flipBadgeEl = null;
+let lastCoopSnap = null;
+let netStats = { p2p: false, pingMs: null };
+
+function renderCoopPresence() {
+  const el = $('coop-presence');
+  if (!el) return;
+  if (!lastCoopSnap || !lastCoopSnap.seats) { el.hidden = true; return; }
+  el.hidden = false;
+  const online = lastCoopSnap.seats.filter((s) => s.occupant === 'human' && s.connected).length;
+  if (online >= 2) {
+    const mode = netStats.p2p ? 'P2P' : 'Relay';
+    const ping = Number.isFinite(netStats.pingMs) ? ` · ${netStats.pingMs}ms` : '';
+    el.textContent = ping ? `🟢 ${mode}${ping}` : '🟢 2/2 Online';
+    if (Number.isFinite(netStats.pingMs) && netStats.pingMs > 150) el.style.color = '#b91c1c';
+    else if (Number.isFinite(netStats.pingMs) && netStats.pingMs >= 80) el.style.color = '#b45309';
+    else el.style.color = '#1b7a4b';
+  } else {
+    el.textContent = '🟡 Partner Offline (30s)';
+    el.style.color = '#b45309';
+  }
+}
 
 export const hud = {
   show() { $('hud').hidden = false; },
-  hide() { $('hud').hidden = true; hud.clearPopups(); },
+  hide() { $('hud').hidden = true; hud.chatOpen(false); hud.clearPopups(); },
   clearPopups() {
     clearTimeout(tauntTimer);
     clearTimeout(toastTimer);
@@ -47,7 +70,12 @@ export const hud = {
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { el.hidden = true; el.className = ''; }, ms);
   },
-  flipped(on) { $('flip-badge').hidden = !on; },
+  flipped(on) {
+    const next = Boolean(on);
+    if (next === lastFlipped) return;
+    lastFlipped = next;
+    (flipBadgeEl ??= $('flip-badge')).hidden = !next;
+  },
   doorWait(on, text) {
     const el = $('door-badge');
     if (!el) return;
@@ -79,22 +107,63 @@ export const hud = {
   coopControls(isCoop) {
     const leaveBtn = $('btn-leave');
     if (leaveBtn) leaveBtn.hidden = !isCoop;
+    const chatBtn = $('btn-chat');
+    if (chatBtn) chatBtn.hidden = !isCoop;
     const pres = $('coop-presence');
     if (pres && !isCoop) pres.hidden = true;
+    if (!isCoop) {
+      hud.chatOpen(false);
+      hud.clearChat();
+    }
+  },
+  isChatOpen() {
+    const panel = $('game-chat');
+    return Boolean(panel && !panel.hidden);
+  },
+  chatOpen(open) {
+    const panel = $('game-chat');
+    if (!panel) return;
+    panel.hidden = !open;
+    const btn = $('btn-chat');
+    if (btn) btn.setAttribute('aria-expanded', String(Boolean(open)));
+    if (open) {
+      const dot = $('chat-unread');
+      if (dot) dot.hidden = true;
+    }
+  },
+  chatMessage(senderName, text, isMe = false) {
+    const log = $('game-chat-log');
+    if (log) {
+      const row = document.createElement('div');
+      row.className = `chat-msg${isMe ? ' me' : ''}`;
+      const b = document.createElement('b');
+      b.textContent = `${senderName}:`;
+      const span = document.createElement('span');
+      span.textContent = text;
+      row.append(b, span);
+      log.appendChild(row);
+      while (log.children.length > 40) log.removeChild(log.firstChild);
+      log.scrollTop = log.scrollHeight;
+    }
+    if (!isMe && !hud.isChatOpen()) {
+      const dot = $('chat-unread');
+      if (dot) dot.hidden = false;
+      hud.toast(`💬 ${senderName}: ${text}`, 2800);
+    }
+  },
+  clearChat() {
+    const log = $('game-chat-log');
+    if (log) log.innerHTML = '';
+    const dot = $('chat-unread');
+    if (dot) dot.hidden = true;
   },
   coopPresence(snap) {
-    const el = $('coop-presence');
-    if (!el) return;
-    if (!snap || !snap.seats) { el.hidden = true; return; }
-    el.hidden = false;
-    const online = snap.seats.filter((s) => s.occupant === 'human' && s.connected).length;
-    if (online >= 2) {
-      el.textContent = '🟢 2/2 Online';
-      el.style.color = '#1b7a4b';
-    } else {
-      el.textContent = '🟡 Partner Offline (30s)';
-      el.style.color = '#b45309';
-    }
+    lastCoopSnap = snap;
+    renderCoopPresence();
+  },
+  coopNetStats(stats) {
+    if (stats) netStats = { ...netStats, ...stats };
+    renderCoopPresence();
   },
   portraitHint(show) { $('rotate-hint').hidden = !show; },
   iris(onDone, reducedMotion = false) {

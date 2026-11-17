@@ -14,6 +14,7 @@ export function createCoopLobby(_levels, callbacks) {
   let latestSnapshot = null;
   let copyTimer = 0;
   let reserveSeq = 0;
+  let matchStarted = false;
 
   $('coop-name').value = loadCoopName();
 
@@ -21,6 +22,7 @@ export function createCoopLobby(_levels, callbacks) {
     onStatus(kind, message) {
       $('coop-status').textContent = message;
       if (kind === 'rejected') {
+        matchStarted = false;
         currentCode = null;
         latestSnapshot = null;
         $('coop-code').textContent = '--- --- ---';
@@ -33,29 +35,42 @@ export function createCoopLobby(_levels, callbacks) {
       $('coop-code').textContent = formatRoomCode(snap.code);
       renderRoster(snap);
       callbacks.onSnapshot?.(snap);
-      if (snap.started && !$('coop').hidden) {
+      if (snap.started && !matchStarted) {
+        matchStarted = true;
         $('coop').hidden = true;
         callbacks.onMatchStart?.(snap.levelIndex, snap);
+      } else if (!snap.started) {
+        matchStarted = false;
       }
     },
     onStarted(levelIndex) {
       $('coop').hidden = true;
+      if (matchStarted) return;
+      matchStarted = true;
       callbacks.onMatchStart?.(levelIndex, latestSnapshot);
     },
     onGuestInput: callbacks.onGuestInput,
+    onGuestState: callbacks.onGuestState,
+    onNetStats: callbacks.onNetStats,
     onStateSync: callbacks.onStateSync,
     onEventSync: callbacks.onEventSync,
     onRestart: callbacks.onRestart,
     onEmote: callbacks.onEmote,
+    onChat(msg) {
+      appendLobbyChat(msg.senderName || 'Partner', msg.text, false);
+      callbacks.onChat?.(msg);
+    },
     onPeerLeft() {
       $('coop-status').textContent = t('coop.waitP2');
       callbacks.onPeerLeft?.();
     },
     onRoomClosed(reason, message) {
+      matchStarted = false;
       currentCode = null;
       latestSnapshot = null;
       $('coop-code').textContent = '--- --- ---';
       renderRoster(null);
+      clearLobbyChat();
       $('coop-status').textContent = message || 'Room closed.';
       callbacks.onRoomClosed?.(reason, message);
     },
@@ -63,6 +78,39 @@ export function createCoopLobby(_levels, callbacks) {
       $('coop-status').textContent = msg;
     },
   });
+
+  function appendLobbyChat(senderName, text, isMe) {
+    const log = $('coop-chat-log');
+    if (!log) return;
+    const row = document.createElement('div');
+    row.className = `chat-msg${isMe ? ' me' : ''}`;
+    const b = document.createElement('b');
+    b.textContent = `${senderName}:`;
+    const span = document.createElement('span');
+    span.textContent = text;
+    row.append(b, span);
+    log.appendChild(row);
+    while (log.children.length > 40) log.removeChild(log.firstChild);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function clearLobbyChat() {
+    const log = $('coop-chat-log');
+    if (log) log.innerHTML = '';
+  }
+
+  function sendLobbyChat(raw) {
+    const text = String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
+    if (!text) return;
+    if (!session.isConnected()) {
+      $('coop-status').textContent = 'Connect to a room first to chat.';
+      return;
+    }
+    const myName = $('coop-name').value.trim() || (latestSnapshot?.isHost === false ? 'Mimi' : 'Momo');
+    session.sendChat(text);
+    appendLobbyChat(myName, text, true);
+    callbacks.onChatSent?.(myName, text);
+  }
 
   function renderRoster(snap) {
     const rosterEl = $('coop-roster');
@@ -167,7 +215,7 @@ export function createCoopLobby(_levels, callbacks) {
   }
 
   $('coop-tab-create').addEventListener('click', () => {
-    if (tab !== 'create') hostNewRoom();
+    if (tab !== 'create' || !currentCode) hostNewRoom();
   });
   $('coop-tab-join').addEventListener('click', () => {
     if (tab === 'join') return;
@@ -199,10 +247,21 @@ export function createCoopLobby(_levels, callbacks) {
       joinByCode($('coop-join-input').value);
     }
   });
+  $('coop-chat-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const inp = $('coop-chat-input');
+    sendLobbyChat(inp.value);
+    inp.value = '';
+  });
+  $('coop-chat-quick').addEventListener('click', (e) => {
+    const chip = e.target.closest?.('button[data-msg]');
+    if (chip) sendLobbyChat(chip.dataset.msg);
+  });
   $('coop-start').addEventListener('click', () => session.startMatch(0));
   $('coop-close').addEventListener('click', () => {
     $('coop').hidden = true;
     session.leave();
+    clearLobbyChat();
     latestSnapshot = null;
     currentCode = null;
     callbacks.onClosed?.();
@@ -211,14 +270,18 @@ export function createCoopLobby(_levels, callbacks) {
   return {
     openCreate() {
       $('coop').hidden = false;
+      clearLobbyChat();
       $('coop-name').focus();
       hostNewRoom();
     },
     openJoin(prefillCode) {
       $('coop').hidden = false;
+      clearLobbyChat();
       $('coop-name').focus();
       joinByCode(prefillCode);
     },
+    appendChat: appendLobbyChat,
+    clearChat: clearLobbyChat,
     session,
     getSnapshot: () => latestSnapshot,
     close() { $('coop').hidden = true; },

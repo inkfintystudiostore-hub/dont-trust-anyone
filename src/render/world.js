@@ -27,6 +27,7 @@ const GEO = {
   pie: new SphereGeometry(0.24, 12, 10),
   backdrop: new PlaneGeometry(1, 1),
   shadowDisc: new CircleGeometry(0.42, 20),
+  signLabel: new PlaneGeometry(1.52, 0.68),
 };
 
 const THEMES = {
@@ -103,6 +104,32 @@ const MAT = {
 
 const SPIKE_X = [0.2, 0.5, 0.8];
 const SPIKE_Z = [0.55, -0.15];
+const damp = (rate, dt) => 1 - Math.exp(-rate * dt);
+
+const tintedMaterialCache = new Map();
+function getTintedMaterial(mat, hex) {
+  let byMat = tintedMaterialCache.get(hex);
+  if (!byMat) {
+    byMat = new WeakMap();
+    tintedMaterialCache.set(hex, byMat);
+  }
+  let tinted = byMat.get(mat);
+  if (!tinted) {
+    tinted = mat.clone();
+    tinted.color?.set(hex);
+    byMat.set(mat, tinted);
+  }
+  return tinted;
+}
+
+function setShadow(obj, cast, receive) {
+  obj.traverse((o) => {
+    if (o.isMesh) {
+      o.castShadow = cast;
+      o.receiveShadow = receive;
+    }
+  });
+}
 
 function makeShadowTex() {
   const c = document.createElement('canvas');
@@ -170,9 +197,14 @@ export function buildWorld(scene, level, models) {
   dummy.rotation.set(0, 0, 0);
 
   // trap visuals, index-aligned with level.trapDefs (and game.traps)
+  const ghostFloorCells = [];
+  let hasBombs = false;
   const visuals = level.trapDefs.map((d) => {
     let v = null;
-    if (d.kind === 'fallingFloor' || d.kind === 'ghostFloor' || d.kind === 'launchFloor') {
+    if (d.kind === 'ghostFloor') {
+      ghostFloorCells.push([d.cx, d.cy]);
+      return null;
+    } else if (d.kind === 'fallingFloor' || d.kind === 'launchFloor') {
       v = new Group();
       v.add(new Mesh(GEO.block, theme.dirt));
       const grass = new Mesh(GEO.grass, theme.grass);
@@ -345,12 +377,7 @@ export function buildWorld(scene, level, models) {
       v = models.coop_switch.clone(true);
       if (d.kind === 'plateB') {
         v.traverse((o) => {
-          if (o.isMesh && o.material) {
-            const m = o.material.clone();
-            m.color?.set('#45c49e');
-            o.material = m;
-            owned.push(m);
-          }
+          if (o.isMesh && o.material) o.material = getTintedMaterial(o.material, '#45c49e');
         });
       }
       v.position.set(d.cx + 0.5, d.cy, 0);
@@ -376,6 +403,7 @@ export function buildWorld(scene, level, models) {
       v.userData.beams = beams;
       v.position.set(d.cx + 0.5, d.cy, 0);
     } else if (d.kind === 'bomb') {
+      hasBombs = true;
       v = new Group();
       const bombMesh = models.ticking_bomb.clone(true);
       bombMesh.position.y = 0.05;
@@ -429,23 +457,98 @@ export function buildWorld(scene, level, models) {
     } else if (d.kind === 'syncPlate') {
       v = models.coop_switch.clone(true);
       v.traverse((o) => {
-        if (o.isMesh && o.material) {
-          const m = o.material.clone();
-          m.color?.set('#ffb703');
-          o.material = m;
-          owned.push(m);
-        }
+        if (o.isMesh && o.material) o.material = getTintedMaterial(o.material, '#ffb703');
       });
+      v.position.set(d.cx + 0.5, d.cy, 0);
+    } else if (d.kind === 'bluffDoor') {
+      v = models.darwaza.clone(true);
+      addDoorEyes(v);
+      v.position.set(d.cx + 0.5, d.cy, -0.25);
+    } else if (d.kind === 'weightBridge') {
+      v = new Group();
+      const plank = new Mesh(GEO.block, getTintedMaterial(theme.dirt, '#c98a5b'));
+      plank.scale.set(0.98, 0.35, 0.96);
+      plank.position.y = 0.32;
+      v.add(plank);
+      for (const sx of [-0.4, 0.4]) {
+        const cap = new Mesh(GEO.bar, MAT.syncAmber);
+        cap.scale.set(0.55, 1.1, 1.35);
+        cap.position.set(sx, 0.52, 0);
+        v.add(cap);
+      }
+      v.position.set(d.cx + 0.5, d.cy + 0.5, 0);
+    } else if (d.kind === 'shyPlatform') {
+      v = new Group();
+      const body = new Mesh(GEO.block, theme.dirt);
+      const grass = new Mesh(GEO.grass, theme.grass);
+      grass.position.y = 0.42;
+      v.add(body, grass);
+      for (const sx of [-0.14, 0.14]) {
+        const eye = new Mesh(GEO.eye, MAT.eye);
+        eye.position.set(sx, 0.08, 1.02);
+        eye.scale.set(0.85, 0.7, 0.4);
+        v.add(eye);
+        const cheek = new Mesh(GEO.eye, MAT.blush);
+        cheek.position.set(sx * 1.9, -0.02, 1.01);
+        cheek.scale.set(0.95, 0.55, 0.35);
+        v.add(cheek);
+      }
+      v.position.set(d.cx + 0.5, d.cy + 0.5, 0);
+    } else if (d.kind === 'hungryFloor') {
+      v = new Group();
+      const body = new Mesh(GEO.block, theme.dirt);
+      const grass = new Mesh(GEO.grass, theme.grass);
+      grass.position.y = 0.42;
+      for (const sx of [-0.16, 0.16]) {
+        const eye = new Mesh(GEO.eye, MAT.eyeWhite);
+        eye.position.set(sx, 0.12, 1.02);
+        eye.scale.set(0.85, 0.55, 0.35);
+        v.add(eye);
+        const pupil = new Mesh(GEO.eye, MAT.eye);
+        pupil.position.set(sx, 0.11, 1.04);
+        pupil.scale.set(0.45, 0.4, 0.25);
+        v.add(pupil);
+      }
+      const teeth = new Group();
+      for (let ti = -1; ti <= 1; ti++) {
+        const tooth = new Mesh(GEO.tooth, MAT.tooth);
+        tooth.position.set(ti * 0.24, 0.55, 0.25);
+        teeth.add(tooth);
+      }
+      teeth.visible = false;
+      v.userData.teeth = teeth;
+      v.add(body, grass, teeth);
+      v.position.set(d.cx + 0.5, d.cy + 0.5, 0);
+    } else if (d.kind === 'countdownLie') {
+      v = models.countdown_speaker ? models.countdown_speaker.clone(true) : new Group();
+      v.position.set(d.cx + 0.5, d.cy + 0.35, -0.2);
+    } else if (d.kind === 'portalWall') {
+      v = models.portal_gate ? models.portal_gate.clone(true) : new Group();
       v.position.set(d.cx + 0.5, d.cy, 0);
     }
 
     if (v) {
       v.userData.kind = d.kind;
-      v.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      const isNoShadowTrap = d.kind === 'gravityFlip' || d.kind === 'controlsFlip';
+      setShadow(v, !isNoShadowTrap, !isNoShadowTrap);
+      if (d.kind === 'gateA' || d.kind === 'gateB') {
+        if (v.userData.beams) setShadow(v.userData.beams, false, false);
+      } else if (d.kind === 'darkCandle') {
+        if (v.userData.flame) setShadow(v.userData.flame, false, false);
+      } else if (d.kind === 'bomb') {
+        if (v.userData.fuseBg) setShadow(v.userData.fuseBg, false, false);
+        if (v.userData.fuseFill) setShadow(v.userData.fuseFill, false, false);
+        if (v.userData.defuseFill) setShadow(v.userData.defuseFill, false, false);
+      }
       root.add(v);
     }
     return v;
   });
+
+  if (ghostFloorCells.length) {
+    root.add(instanced(GEO.block, theme.dirt, ghostFloorCells, (cx, cy) => { dummy.rotation.set(0, 0, 0); dummy.position.set(cx + 0.5, cy + 0.5, 0); }));
+    root.add(instanced(GEO.grass, theme.grass, ghostFloorCells, (cx, cy) => { dummy.rotation.set(0, 0, 0); dummy.position.set(cx + 0.5, cy + 0.92, 0); }));
+  }
 
   // door + procedural eyes + co-op padlock
   const door = level.door ? models.darwaza.clone(true) : null;
@@ -467,10 +570,10 @@ export function buildWorld(scene, level, models) {
     const sign = models.gappu_sign.clone(true);
     sign.position.set(s.x, topAt(Math.floor(s.x)), -0.6);
     const tex = textTexture(t(s.text));
-    const label = new Mesh(new PlaneGeometry(1.0, 0.42), new MeshBasicMaterial({ map: tex, transparent: true }));
-    label.position.set(0, 0.86, 0.32);
+    const label = new Mesh(GEO.signLabel, new MeshBasicMaterial({ map: tex, transparent: true }));
+    label.position.set(0, 1.28, 0.47);
     sign.add(label);
-    owned.push(tex, label.geometry, label.material);
+    owned.push(tex, label.material);
     root.add(sign);
   }
 
@@ -494,12 +597,14 @@ export function buildWorld(scene, level, models) {
     tree.scale.setScalar(1.3 + rand() * 1.1);
     tree.position.set(x, backY, -3 - rand() * 4);
     tree.rotation.y = (rand() - 0.5) * 0.8;
+    setShadow(tree, false, false);
     root.add(tree);
   }
   for (let i = 0; i < 2; i++) {
     const b = models.boulder.clone(true);
     b.scale.setScalar(0.8 + rand() * 0.6);
     b.position.set(rand() * W, backY, -2.5 - rand() * 3);
+    setShadow(b, false, false);
     root.add(b);
   }
   const clouds = [];
@@ -508,6 +613,7 @@ export function buildWorld(scene, level, models) {
     c.scale.setScalar(1.8 + rand() * 2);
     c.position.set(-8 + rand() * (W + 16), H + 1 + rand() * 3, -7 - rand() * 6);
     c.userData.speed = 0.15 + rand() * 0.25;
+    setShadow(c, false, false);
     clouds.push(c);
     root.add(c);
   }
@@ -558,7 +664,6 @@ export function buildWorld(scene, level, models) {
   owned.push(shadowTex);
 
   function update(g, dt, time, alpha = 1) {
-    const k = (rate) => 1 - Math.exp(-rate * dt);
     skyUniforms.uTime.value = time;
     skyUniforms.uScroll.value = g.player.x * 0.12;
 
@@ -580,14 +685,14 @@ export function buildWorld(scene, level, models) {
         v.visible = tr.revealed;
       } else if (tr.kind === 'hiddenSpikes') {
         const target = tr.active ? 1 : 0.01;
-        v.scale.y += (target - v.scale.y) * k(30);
+        v.scale.y += (target - v.scale.y) * damp(30, dt);
         v.visible = tr.active || v.scale.y > 0.03;
       } else if (tr.kind === 'antiJump') {
         const sp = v.userData.spikes;
         if (sp) {
           sp.visible = tr.active;
           const target = tr.active ? 1.35 : 0.01;
-          sp.scale.y += (target - sp.scale.y) * k(34);
+          sp.scale.y += (target - sp.scale.y) * damp(34, dt);
         }
       } else if (tr.kind === 'bananaPeel') {
         if (tr.triggered) { v.rotation.y += dt * 14; v.position.y = tr.cy + 0.15; }
@@ -602,7 +707,7 @@ export function buildWorld(scene, level, models) {
         v.position.y = tr.cy + 0.5 + (tr.triggered ? 0 : Math.sin(time * 4 + tr.cx) * 0.08);
       } else if (tr.kind === 'fakeDoor') {
         const targetRot = tr.triggered ? -Math.PI / 2 : 0;
-        v.rotation.x += (targetRot - v.rotation.x) * k(14);
+        v.rotation.x += (targetRot - v.rotation.x) * damp(14, dt);
       } else if (tr.kind === 'conveyor') {
         v.userData.bar.position.x = (((time * tr.dir * 2) % 0.6) + 0.6) % 0.6 - 0.3;
       } else if (tr.kind === 'crusher') {
@@ -623,7 +728,7 @@ export function buildWorld(scene, level, models) {
         v.rotation.y = Math.sin(time * 2) * 0.25;
       } else if (tr.kind === 'sneezeCloud') {
         const s = tr.state === 'charging' ? 1.28 : 1;
-        v.scale.setScalar(v.scale.x + (s - v.scale.x) * k(14));
+        v.scale.setScalar(v.scale.x + (s - v.scale.x) * damp(14, dt));
         v.position.x = tr.cx + 0.5 + (tr.state === 'sneezing' ? Math.sin(time * 80) * 0.12 : 0);
       } else if (tr.kind === 'fakeCheckpoint') {
         if (tr.triggered) {
@@ -655,7 +760,7 @@ export function buildWorld(scene, level, models) {
         const iy = (tr.prevY ?? tr.y) + (tr.y - (tr.prevY ?? tr.y)) * alpha;
         v.position.set(ix, iy, 0);
         const targetYaw = tr.face > 0 ? 0.55 : -0.55;
-        v.rotation.y += (targetYaw - v.rotation.y) * k(16);
+        v.rotation.y += (targetYaw - v.rotation.y) * damp(16, dt);
         const hop = tr.onGround && Math.abs(tr.vx) > 0.2 ? Math.abs(Math.sin(time * 16)) * 0.08 : 0;
         v.position.y += hop;
         if (v.userData.eyes) {
@@ -674,7 +779,7 @@ export function buildWorld(scene, level, models) {
           if (d < bestD) { bestD = d; nearest = pl; }
         }
         const lookYaw = nearest.x >= ix ? 0.45 : -0.45;
-        v.rotation.y += ((tr.shy ? lookYaw * 0.35 : lookYaw) - v.rotation.y) * k(12);
+        v.rotation.y += ((tr.shy ? lookYaw * 0.35 : lookYaw) - v.rotation.y) * damp(12, dt);
         if (v.userData.eyes) {
           for (const eye of v.userData.eyes) {
             eye.scale.set(tr.shy ? 1.25 : 0.95, tr.shy ? 0.22 : 1.15, 0.5);
@@ -688,12 +793,12 @@ export function buildWorld(scene, level, models) {
         }
       } else if (tr.kind === 'plateA' || tr.kind === 'plateB') {
         const ty = tr.pressed ? 0.55 : 1.0;
-        v.scale.y += (ty - v.scale.y) * k(22);
+        v.scale.y += (ty - v.scale.y) * damp(22, dt);
       } else if (tr.kind === 'gateA' || tr.kind === 'gateB') {
         const beams = v.userData.beams;
         if (beams) {
           const ty = tr.open ? 0.01 : 1;
-          beams.scale.y += (ty - beams.scale.y) * k(28);
+          beams.scale.y += (ty - beams.scale.y) * damp(28, dt);
           beams.visible = beams.scale.y > 0.05;
         }
       } else if (tr.kind === 'bomb') {
@@ -736,7 +841,7 @@ export function buildWorld(scene, level, models) {
         const { cannon, pieMesh } = v.userData;
         if (cannon) {
           const targetS = tr.state === 'charging' ? 0.85 : 1.0;
-          cannon.scale.x += (targetS - cannon.scale.x) * k(18);
+          cannon.scale.x += (targetS - cannon.scale.x) * damp(18, dt);
         }
         if (pieMesh) {
           pieMesh.visible = tr.state === 'flying';
@@ -752,7 +857,30 @@ export function buildWorld(scene, level, models) {
         v.scale.y = tr.active ? 1 + Math.abs(Math.sin(time * 22)) * 0.1 : 1;
       } else if (tr.kind === 'syncPlate') {
         const ty = tr.pressed ? 0.55 : 1.0;
-        v.scale.y += (ty - v.scale.y) * k(22);
+        v.scale.y += (ty - v.scale.y) * damp(22, dt);
+      } else if (tr.kind === 'weightBridge') {
+        v.visible = tr.state !== 'fallen';
+        v.position.x = tr.cx + 0.5 + (tr.state === 'shaking' ? Math.sin(time * 55) * 0.08 : 0);
+        v.position.y = tr.cy + 0.5 + (tr.state === 'shaking' ? -0.05 + Math.cos(time * 42) * 0.03 : 0);
+        v.rotation.z = tr.state === 'shaking' ? Math.sin(time * 48) * 0.07 : 0;
+      } else if (tr.kind === 'shyPlatform') {
+        const dx = tr.x - v.position.x;
+        v.position.x += dx * damp(18, dt);
+        v.rotation.z += (Math.max(-0.18, Math.min(0.18, -dx * 0.25)) - v.rotation.z) * damp(14, dt);
+      } else if (tr.kind === 'hungryFloor') {
+        const chomp = tr.state === 'chomp' ? 0.45 : (tr.timer > 0.12 ? 0.85 + Math.sin(time * 40) * 0.12 : 1);
+        v.scale.y += (chomp - v.scale.y) * damp(20, dt);
+        if (v.userData.teeth) v.userData.teeth.visible = tr.state === 'chomp' || tr.timer > 0.12;
+      } else if (tr.kind === 'countdownLie') {
+        v.visible = tr.state !== 'done';
+        v.position.y = tr.cy + 0.35 + Math.sin(time * 8) * 0.12;
+        v.rotation.z = tr.state === 'counting' ? Math.sin(time * 24) * 0.16 : 0;
+        const pulse = tr.state === 'counting' ? 1 + Math.abs(Math.sin(time * 16)) * 0.18 : 1;
+        v.scale.setScalar(pulse);
+      } else if (tr.kind === 'portalWall') {
+        const s = 1 + Math.sin(time * 6) * 0.07;
+        v.scale.set(s, 1 + Math.cos(time * 6) * 0.05, s);
+        v.position.y = tr.cy + Math.sin(time * 3.5) * 0.08;
       }
     }
 
@@ -806,7 +934,13 @@ export function buildWorld(scene, level, models) {
     // door hop + eye expression + co-op lock badge
     if (door) {
       if (doorLock) {
-        const locked = (g.keysLeft ?? 0) > 0 || g.traps.some((t) => t.kind === 'bomb' && !t.defused);
+        let locked = (g.keysLeft ?? 0) > 0;
+        if (!locked && hasBombs) {
+          for (let ti = 0; ti < g.traps.length; ti++) {
+            const tr = g.traps[ti];
+            if (tr.kind === 'bomb' && !tr.defused) { locked = true; break; }
+          }
+        }
         doorLock.visible = locked;
         if (locked) doorLock.rotation.z = Math.sin(time * 4) * 0.08;
       }
@@ -823,10 +957,24 @@ export function buildWorld(scene, level, models) {
         doorEyes.scale.set(1.35, 1.35, 1);
       } else {
         door.rotation.y = Math.sin(time * 2) * 0.08;
-        const near = g.door ? (g.players ?? [g.player]).some((pl) => Math.hypot(pl.x - g.door.x, pl.y - g.door.y) < 3) : false;
+        let near = false;
+        if (g.door) {
+          const pls = g.players;
+          for (let pi = 0; pi < pls.length; pi++) {
+            if (Math.hypot(pls[pi].x - g.door.x, pls[pi].y - g.door.y) < 3) { near = true; break; }
+          }
+        }
         const blink = (time % 3.6) < 0.1 ? 0.15 : 1;
         doorEyes.scale.set(near ? 1.25 : 1, near ? 1.25 * blink : blink, 1);
       }
+      const targetDoorScale = g.door?.shrunk ? 0.3 : 1;
+      const curScale = door.scale.x + (targetDoorScale - door.scale.x) * damp(14, dt);
+      door.scale.setScalar(curScale);
+    }
+    const bluff = g.bluffDoor;
+    if (bluff && g.door) {
+      const realX = bluff.swapped ? bluff.cx + 0.5 : g.door.x;
+      pigeon.rotation.y = realX >= pigeon.position.x ? 0 : Math.PI;
     }
     pigeon.position.y = pigeonBaseY + Math.sin(time * 4) * 0.05;
     pigeon.rotation.z = Math.sin(time * 3) * 0.06;
@@ -904,16 +1052,47 @@ export function buildWorld(scene, level, models) {
   return { root, update, snap, dispose, door };
 }
 
+function wrapSignLines(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return [text];
+  const words = text.split(' ');
+  if (words.length < 2) return [text];
+  let bestSplit = 1;
+  let bestDiff = Infinity;
+  for (let i = 1; i < words.length; i++) {
+    const l1 = words.slice(0, i).join(' ');
+    const l2 = words.slice(i).join(' ');
+    const diff = Math.abs(ctx.measureText(l1).width - ctx.measureText(l2).width);
+    if (diff < bestDiff) { bestDiff = diff; bestSplit = i; }
+  }
+  return [words.slice(0, bestSplit).join(' '), words.slice(bestSplit).join(' ')];
+}
+
 function textTexture(text) {
   const c = document.createElement('canvas');
-  c.width = 512; c.height = 216;
+  c.width = 640; c.height = 286;
   const x = c.getContext('2d');
-  x.fillStyle = '#8b0d1a';
   x.textAlign = 'center';
   x.textBaseline = 'middle';
-  let size = 92;
-  do { x.font = `800 ${size}px Outfit, system-ui, sans-serif`; size -= 4; } while (x.measureText(text).width > 470 && size > 30);
-  x.fillText(text, 256, 112);
+  x.lineJoin = 'round';
+  let size = 108;
+  let lines = [text];
+  while (size >= 52) {
+    x.font = `800 ${size}px Outfit, system-ui, sans-serif`;
+    lines = wrapSignLines(x, text, 580);
+    const widest = Math.max(...lines.map((l) => x.measureText(l).width));
+    if (widest <= 580 && lines.length * size * 1.12 <= 250) break;
+    size -= 4;
+  }
+  x.lineWidth = Math.max(6, Math.round(size * 0.14));
+  x.strokeStyle = 'rgba(255, 251, 247, 0.92)';
+  x.fillStyle = '#8b0d1a';
+  const lineH = size * 1.12;
+  const startY = 143 - ((lines.length - 1) * lineH) / 2;
+  for (let i = 0; i < lines.length; i++) {
+    const y = startY + i * lineH;
+    x.strokeText(lines[i], 320, y);
+    x.fillText(lines[i], 320, y);
+  }
   const tex = new CanvasTexture(c);
   tex.colorSpace = SRGBColorSpace;
   return tex;

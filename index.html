@@ -27,9 +27,14 @@
       <button class="pill btn-pill" id="btn-restart" title="Restart (R)" aria-label="Restart">
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
       </button>
+      <button class="pill btn-pill" id="btn-hint" title="Hint (H)" aria-label="Hint">💡</button>
       <button class="pill btn-pill" id="btn-mute" title="Sound" aria-label="Sound" aria-pressed="false"></button>
       <button class="pill btn-pill" id="btn-fullscreen" title="Fullscreen" aria-label="Fullscreen" aria-pressed="false">
         <span class="ico-wrap" aria-hidden="true"></span><span class="fs-label">Full</span>
+      </button>
+      <button class="pill btn-pill" id="btn-chat" hidden title="Co-op Chat" aria-label="Co-op Chat" aria-expanded="false">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H7l-4 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/></svg>
+        <span id="chat-unread" class="chat-dot" hidden></span>
       </button>
       <button class="pill btn-pill" id="btn-leave" hidden title="Leave Co-op Room" aria-label="Leave Co-op Room">
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
@@ -47,6 +52,27 @@
         <b id="deaths">0</b>
       </div>
     </div>
+  </div>
+
+  <div id="game-chat" class="game-chat" hidden role="region" aria-label="Co-op Chat">
+    <div class="game-chat-head">
+      <span>Co-op Chat</span>
+      <button id="game-chat-close" class="pill btn-pill" type="button" aria-label="Close Chat">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="game-chat-log" class="chat-log" aria-live="polite"></div>
+    <div class="chat-quick" id="game-chat-quick">
+      <button type="button" class="chat-chip" data-msg="Wait! ✋">Wait! ✋</button>
+      <button type="button" class="chat-chip" data-msg="Jump! ⬆️">Jump! ⬆️</button>
+      <button type="button" class="chat-chip" data-msg="Watch out! ⚠️">Watch out! ⚠️</button>
+      <button type="button" class="chat-chip" data-msg="Nice! 🎉">Nice! 🎉</button>
+      <button type="button" class="chat-chip" data-msg="Sorry! 😅">Sorry! 😅</button>
+    </div>
+    <form id="game-chat-form" class="chat-form">
+      <input id="game-chat-input" class="field chat-input" type="text" maxlength="120" autocomplete="off" placeholder="Message partner…">
+      <button type="submit" class="btn chat-send">Send</button>
+    </form>
   </div>
 
   <div id="rotate-hint" hidden data-i18n="hud.rotate"></div>
@@ -102,6 +128,19 @@
       </div>
 
       <div id="coop-roster" class="roster"></div>
+      <div id="coop-chat" class="coop-chat">
+        <div id="coop-chat-log" class="chat-log" aria-live="polite"></div>
+        <div class="chat-quick" id="coop-chat-quick">
+          <button type="button" class="chat-chip" data-msg="Ready! 🚀">Ready! 🚀</button>
+          <button type="button" class="chat-chip" data-msg="Wait! ✋">Wait! ✋</button>
+          <button type="button" class="chat-chip" data-msg="Let's go! 🔥">Let's go! 🔥</button>
+          <button type="button" class="chat-chip" data-msg="Haha 😂">Haha 😂</button>
+        </div>
+        <form id="coop-chat-form" class="chat-form">
+          <input id="coop-chat-input" class="field chat-input" type="text" maxlength="120" autocomplete="off" placeholder="Chat with friend…">
+          <button id="coop-chat-send" type="submit" class="btn chat-send">Send</button>
+        </form>
+      </div>
       <p id="coop-status" class="coop-status" role="status" aria-live="polite"></p>
       <button id="coop-start" class="btn" type="button" hidden data-i18n="coop.startBtn"></button>
     </div>
@@ -154,7 +193,7 @@
     </div>
   </div>
 
-  <div id="loading" class="overlay"><div class="card"><h1 data-i18n="loading.title"></h1></div></div>
+  <div id="loading" class="overlay"><div class="card"><h1 data-i18n="loading.title">Loading…</h1></div></div>
 
   <script type="module" src="/src/main.js"></script>
 </body>

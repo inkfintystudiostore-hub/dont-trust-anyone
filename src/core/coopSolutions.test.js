@@ -3,6 +3,7 @@ import { LEVELS } from '../levels.js';
 import { createGame, step } from './game.js';
 
 const DT = 1 / 60;
+const NONE = { left: false, right: false, jump: false };
 
 /**
  * Runs 2-player co-op simulation until g.finished, death, or timeout.
@@ -38,7 +39,7 @@ describe('World 5 uncoordinated rushing always fails', () => {
   const rushRight = () => [{ right: true }, { right: true }];
 
   it('L36: rushing through closed hazard gate (=) kills both partners', () => {
-    expect(() => playCoop(35, rushRight, 60 * 6)).toThrow(/died \(gate/);
+    expect(() => playCoop(47, rushRight, 60 * 6)).toThrow(/died \(gate/);
   });
 
   it('L36: jumping over closed hazard gate (=) without pressing H STILL kills (no jump bypass)', () => {
@@ -46,37 +47,37 @@ describe('World 5 uncoordinated rushing always fails', () => {
       { right: true, jump: p0.x >= 9.6 && p0.x <= 10.5 },
       { right: true, jump: p1.x >= 9.6 && p1.x <= 10.5 },
     ];
-    expect(() => playCoop(35, jumpGate, 60 * 6)).toThrow(/died \(gate/);
+    expect(() => playCoop(47, jumpGate, 60 * 6)).toThrow(/died \(gate/);
   });
 
   it('L37: rushing without holding H leaves bomb undefused or hits hidden spikes', () => {
-    expect(() => playCoop(36, rushRight, 60 * 18)).toThrow(/died/);
+    expect(() => playCoop(48, rushRight, 60 * 18)).toThrow(/died/);
   });
 
   it('L38: rushing floor path without upper shield H dies at triple laser', () => {
-    expect(() => playCoop(37, rushRight, 60 * 6)).toThrow(/died \(gate/);
+    expect(() => playCoop(49, rushRight, 60 * 6)).toThrow(/died \(gate/);
   });
 
   it('L39: rushing without holding H dies on gate or bomb', () => {
-    expect(() => playCoop(38, rushRight, 60 * 18)).toThrow(/died/);
+    expect(() => playCoop(50, rushRight, 60 * 18)).toThrow(/died/);
   });
 
   it('L40: rushing without watchtower plate H dies at closed laser', () => {
-    expect(() => playCoop(39, rushRight, 60 * 6)).toThrow(/died \(gate/);
+    expect(() => playCoop(51, rushRight, 60 * 6)).toThrow(/died \(gate/);
   });
 
   it('L41: rushing without holding H or clearing launch floor dies', () => {
-    expect(() => playCoop(40, rushRight, 60 * 6)).toThrow(/died/);
+    expect(() => playCoop(52, rushRight, 60 * 6)).toThrow(/died/);
   });
 
   it('L42: rushing couples finale without coordination dies', () => {
-    expect(() => playCoop(41, rushRight, 60 * 10)).toThrow(/died/);
+    expect(() => playCoop(53, rushRight, 60 * 10)).toThrow(/died/);
   });
 });
 
 describe('World 5 Couples Co-op 0-death solutions (L36-L42)', () => {
   it('L36: Airlock Key Handoff (H -> * -> H relay -> h -> D)', () => {
-    const g = playCoop(35, (p0, p1, game, _f, st) => {
+    const g = playCoop(47, (p0, p1, game, _f, st) => {
       st.phase ??= 0;
       const doorX = game.door.x;
       if (st.phase === 0) {
@@ -96,7 +97,7 @@ describe('World 5 Couples Co-op 0-death solutions (L36-L42)', () => {
       }
       // P1 holds right h briefly until P0 clears -, then both enter D
       if (p0.x < 22.8) return [moveTo(p0, 23.5), moveTo(p1, 24.5)];
-      return [moveTo(p0, doorX), moveTo(p1, doorX)];
+      return [moveTo(p0, doorX), moveTo(p1, doorX, { jumpIf: p1.x >= 3.0 && p1.x <= 4.5 && p1.onGround })];
     });
     expect(g.finished).toBe(true);
     expect(g.deaths).toBe(0);
@@ -104,7 +105,7 @@ describe('World 5 Couples Co-op 0-death solutions (L36-L42)', () => {
   });
 
   it('L37: Bomb Squad (P0 holds H while P1 jumps S, defuses @, grabs *, holds right H)', () => {
-    const g = playCoop(36, (p0, p1, game, _f, st) => {
+    const g = playCoop(48, (p0, p1, game, _f, st) => {
       st.phase ??= 0;
       const doorX = game.door.x;
       const bomb = game.traps.find((t) => t.kind === 'bomb');
@@ -120,14 +121,14 @@ describe('World 5 Couples Co-op 0-death solutions (L36-L42)', () => {
         const jumpS = p0.x >= 7.6 && p0.x <= 8.2;
         return [moveTo(p0, 22.5, { jumpIf: jumpS }), moveTo(p1, 22.5)];
       }
-      return [moveTo(p0, doorX), moveTo(p1, doorX)];
+      return [moveTo(p0, doorX), moveTo(p1, doorX, { jumpIf: p1.x >= 3.0 && p1.x <= 4.5 && p1.onGround })];
     });
     expect(g.finished).toBe(true);
     expect(g.deaths).toBe(0);
   });
 
   it('L38: Sync Bridge Shield (both hit + together to latch === while P1 grabs * & holds H)', () => {
-    const g = playCoop(37, (p0, p1, game, _f, st) => {
+    const g = playCoop(49, (p0, p1, game, _f, st) => {
       st.phase ??= 0;
       const doorX = game.door.x;
       if (st.phase === 0) {
@@ -141,14 +142,14 @@ describe('World 5 Couples Co-op 0-death solutions (L36-L42)', () => {
         if (game.keysLeft === 0 && p1.x >= 20.2 && p0.x >= 19.5) st.phase = 2;
         return [moveTo(p0, 20.5), moveTo(p1, game.keysLeft > 0 ? 18.5 : 20.5)];
       }
-      return [moveTo(p0, doorX), moveTo(p1, doorX)];
+      return [moveTo(p0, doorX), moveTo(p1, doorX, { jumpIf: p1.x >= 3.0 && p1.x <= 4.5 && p1.onGround })];
     });
     expect(g.finished).toBe(true);
     expect(g.deaths).toBe(0);
   });
 
   it('L39: Anti-Jump + Bomb + Mirror Robot + Pit', () => {
-    const g = playCoop(38, (p0, p1, game, _f, st) => {
+    const g = playCoop(50, (p0, p1, game, _f, st) => {
       st.phase ??= 0;
       const doorX = game.door.x;
       const bomb = game.traps.find((t) => t.kind === 'bomb');
@@ -180,7 +181,7 @@ describe('World 5 Couples Co-op 0-death solutions (L36-L42)', () => {
   });
 
   it('L40: Peek-a-Boo Ghost + Magnet Watchtower (hold H then h to reverse % & freeze Q)', () => {
-    const g = playCoop(39, (p0, p1, game, _f, st) => {
+    const g = playCoop(51, (p0, p1, game, _f, st) => {
       st.phase ??= 0;
       const doorX = game.door.x;
       if (st.phase === 0) {
@@ -207,14 +208,14 @@ describe('World 5 Couples Co-op 0-death solutions (L36-L42)', () => {
         const jumpQ = ghost && Math.abs(ghost.x - p0.x) < 1.6 && p0.x < ghost.x;
         return [moveTo(p0, 22.5, { jumpIf: !!jumpQ }), in1];
       }
-      return [moveTo(p0, doorX), moveTo(p1, doorX)];
+      return [moveTo(p0, doorX), moveTo(p1, doorX, { jumpIf: p1.x >= 3.0 && p1.x <= 4.5 && p1.onGround })];
     });
     expect(g.finished).toBe(true);
     expect(g.deaths).toBe(0);
   });
 
   it('L41: Twin Keys + Launch Floor under Ceiling Spikes', () => {
-    const g = playCoop(40, (p0, p1, game, _f, st) => {
+    const g = playCoop(52, (p0, p1, game, _f, st) => {
       st.phase ??= 0;
       const doorX = game.door.x;
       if (st.phase === 0) {
@@ -235,7 +236,7 @@ describe('World 5 Couples Co-op 0-death solutions (L36-L42)', () => {
         return [moveTo(p0, 20.5), moveTo(p1, game.keysLeft > 0 ? 25.5 : 28.5)];
       }
       if (p0.x < 26.5) return [moveTo(p0, 28.5), moveTo(p1, 28.5)];
-      return [moveTo(p0, doorX), moveTo(p1, doorX)];
+      return [moveTo(p0, doorX), moveTo(p1, doorX, { jumpIf: p1.x >= 3.0 && p1.x <= 4.5 && p1.onGround })];
     });
     expect(g.finished).toBe(true);
     expect(g.deaths).toBe(0);
@@ -243,7 +244,7 @@ describe('World 5 Couples Co-op 0-death solutions (L36-L42)', () => {
   });
 
   it('L42: Couples Finale (Launch + Bomb + Mirror/Ghost + Moving Door)', () => {
-    const g = playCoop(41, (p0, p1, game, _f, st) => {
+    const g = playCoop(53, (p0, p1, game, _f, st) => {
       st.phase ??= 0;
       const doorX = game.door.x;
       const jumpLaunch = (p) => p.x >= 5.1 && p.x <= 5.7;
@@ -280,10 +281,171 @@ describe('World 5 Couples Co-op 0-death solutions (L36-L42)', () => {
         const jumpQ = ghost && Math.abs(ghost.x - p0.x) < 1.3 && p0.x < ghost.x;
         return [moveTo(p0, doorX, { jumpIf: !!jumpQ }), in1];
       }
-      return [moveTo(p0, doorX), moveTo(p1, doorX)];
+      return [moveTo(p0, doorX), moveTo(p1, doorX, { jumpIf: p1.x >= 3.0 && p1.x <= 4.5 && p1.onGround })];
     });
     expect(g.finished).toBe(true);
     expect(g.deaths).toBe(0);
     expect(g.keysLeft).toBe(0);
+  });
+
+  // World 5 Expansion (L55-L62, indices 54-61)
+  it('L55: Weight-Limit Bridge + bananaPeel + hiddenSpikes — P0 crosses first, then P1 crosses', () => {
+    const g = playCoop(54, (p0, p1, game) => {
+      const doorX = game.level.door.x;
+      const jump0 = p0.onGround && ((p0.x >= 19.8 && p0.x <= 21.0) || (p0.x >= 25.8 && p0.x <= 27.0));
+      const jump1 = p1.onGround && ((p1.x >= 19.8 && p1.x <= 21.0) || (p1.x >= 25.8 && p1.x <= 27.0));
+      if (p0.x < 13.0) return [moveTo(p0, doorX, { jumpIf: jump0 }), NONE];
+      return [moveTo(p0, doorX, { jumpIf: jump0 }), moveTo(p1, doorX, { jumpIf: jump1 })];
+    });
+    expect(g.finished).toBe(true);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L56: Weight-Limit Bridge + Hungry Floor + fallingFloor + hiddenSpikes — P0 clears first, then P1', () => {
+    const g = playCoop(55, (p0, p1, game) => {
+      const doorX = game.level.door.x;
+      const jump0 = p0.onGround && ((p0.x >= 17.8 && p0.x <= 19.0) || (p0.x >= 23.8 && p0.x <= 25.0));
+      const jump1 = p1.onGround && ((p1.x >= 17.8 && p1.x <= 19.0) || (p1.x >= 23.8 && p1.x <= 25.0));
+      if (p0.x < 16.0) return [moveTo(p0, doorX, { jumpIf: jump0 }), NONE];
+      return [moveTo(p0, doorX, { jumpIf: jump0 }), moveTo(p1, doorX, { jumpIf: jump1 })];
+    });
+    expect(g.finished).toBe(true);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L57: Door Shrinks + plateA + gateA + key + syncPlate + ghostFloor — P0 holds H, P1 grabs key & crosses, both rush', () => {
+    const g = playCoop(56, (p0, p1, game, _f, st) => {
+      const doorX = game.level.door.x;
+      const jGhost = (p) => p.onGround && p.x >= 12.6 && p.x <= 13.0;
+      const jBan = (p) => p.onGround && p.x >= 23.0 && p.x <= 23.8;
+      if (!st.phase) {
+        if (p0.onGround && p0.y >= 3.5 && game.keysLeft === 0 && p1.x >= 23.0) st.phase = 1;
+        return [
+          moveTo(p0, 8.5, { jumpIf: p0.x >= 5.2 && p0.onGround && p0.y < 3.5 }),
+          game.door.unshrunkTimer > 0 ? moveTo(p1, 23.5, { jumpIf: jGhost(p1) }) : moveTo(p1, 11.0),
+        ];
+      }
+      return [
+        p0.x >= 12.6 && p0.x <= 13.8 ? { left: false, right: true, jump: true } : moveTo(p0, doorX, { jumpIf: jBan(p0) }),
+        p0.x < 15.0 ? moveTo(p1, 23.5) : moveTo(p1, doorX, { jumpIf: jBan(p1) }),
+      ];
+    });
+    expect(g.finished).toBe(true);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L58: Portal Wall + plateB + gateB + key + fallingFloor + hiddenSpikes', () => {
+    const g = playCoop(57, (p0, p1, game, _f, st) => {
+      const doorX = game.level.door.x;
+      const jSpk = (p) => p.onGround && p.y < 4.0 && p.x >= 22.8 && p.x <= 23.8;
+      if (!st.phase) {
+        if (p0.y >= 6.0) st.phase = 1;
+        return [moveTo(p0, 8.8), moveTo(p1, 12.0)];
+      }
+      if (st.phase === 1) {
+        if (game.keysLeft === 0 && p1.x >= 19.2) st.phase = 2;
+        return [
+          moveTo(p0, 10.5, { jumpIf: p0.onGround && p0.x >= 4.8 && p0.x <= 5.8 }),
+          moveTo(p1, 19.5),
+        ];
+      }
+      return [
+        moveTo(p0, doorX, { jumpIf: jSpk(p0) }),
+        p0.x < 15.5 ? moveTo(p1, 19.5) : moveTo(p1, doorX, { jumpIf: jSpk(p1) }),
+      ];
+    });
+    expect(g.finished).toBe(true);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L59: Two-Door Bluff + syncPlate + ghostFloor — both jump bluff door & ghost bridge to syncPlate & real door', () => {
+    const g = playCoop(58, (p0, p1, game) => {
+      const doorX = game.level.door.x;
+      const j = (p) => p.onGround && ((p.x >= 3.2 && p.x <= 4.3) || (p.x >= 6.8 && p.x <= 7.6));
+      return [
+        moveTo(p0, doorX, { jumpIf: j(p0) }),
+        moveTo(p1, doorX, { jumpIf: j(p1) }),
+      ];
+    });
+    expect(g.finished).toBe(true);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L60: Shy Platform + bananaPeel + Weight-Limit Bridge + hiddenSpikes — P0 clears first, then P1', () => {
+    const g = playCoop(59, (p0, p1, game) => {
+      const doorX = game.level.door.x;
+      const j = (p) => p.onGround && (
+        (p.x >= 5.2 && p.x <= 6.2) ||
+        (p.x >= 12.8 && p.x <= 13.8) ||
+        (p.x >= 24.8 && p.x <= 25.8)
+      );
+      if (p0.x < 24.0) return [moveTo(p0, doorX, { jumpIf: j(p0) }), NONE];
+      return [moveTo(p0, doorX, { jumpIf: j(p0) }), moveTo(p1, doorX, { jumpIf: j(p1) })];
+    });
+    expect(g.finished).toBe(true);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L61: Countdown Lie + crusher + Weight-Limit Bridge + fallingFloor', () => {
+    const g = playCoop(60, (p0, p1, game, _f, st) => {
+      const doorX = game.level.door.x;
+      const m = game.traps.find((t) => t.kind === 'crusher');
+      const jFall = (p) => p.onGround && p.x >= 23.8 && p.x <= 24.8;
+      if (!st.phase) {
+        if (m.state === 'rising') st.phase = 1;
+        return [moveTo(p0, 9.0), NONE];
+      }
+      if (st.phase === 1) {
+        if (p0.x >= 22.0) st.phase = 2;
+        return [moveTo(p0, doorX, { jumpIf: jFall(p0) }), NONE];
+      }
+      return [moveTo(p0, doorX, { jumpIf: jFall(p0) }), moveTo(p1, doorX, { jumpIf: jFall(p1) })];
+    });
+    expect(g.finished).toBe(true);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L62: Couple Co-op Grand Finale — bridge one-by-one, both portal -> key -> crusher -> P0 holds H, P1 crosses gate & bluff door to D', () => {
+    const g = playCoop(61, (p0, p1, game, _f, st) => {
+      const doorX = game.level.door.x;
+      const jBan = (p) => p.onGround && p.x >= 13.8 && p.x <= 14.8;
+      const jBluff = (p) => p.onGround && p.x >= 27.8 && p.x <= 28.8;
+      const jSpk = (p) => p.onGround && p.x >= 33.8 && p.x <= 34.8;
+      const m = game.traps.find((t) => t.kind === 'crusher');
+      const crusherSafe = !m || m.state === 'rising' || m.state === 'idle';
+      if (!st.phase) {
+        if (p0.y >= 5.0 && p0.x < 5.0) st.phase = 1;
+        return [moveTo(p0, 18.8, { jumpIf: jBan(p0) }), NONE];
+      }
+      if (st.phase === 1) {
+        if (p1.y >= 5.0 && p1.x < 5.0) st.phase = 2;
+        return [
+          moveTo(p0, 11.2),
+          moveTo(p1, 18.8, { jumpIf: jBan(p1) }),
+        ];
+      }
+      if (st.phase === 2) {
+        if (p0.x >= 16.3 && p0.y >= 5.0) st.p0Past = true;
+        if (p1.x >= 22.0 && p1.y < 4.0) st.phase = 3;
+        if (!st.p0Past) {
+          if (m.state === 'rising') st.p0Go = true;
+          return [
+            st.p0Go ? moveTo(p0, 16.5) : (m.state === 'idle' ? moveTo(p0, 12.6) : moveTo(p0, 11.2)),
+            moveTo(p1, 11.2),
+          ];
+        }
+        if (m.state === 'rising' && st.p0Past && m.y >= 5.5) st.p1Go = true;
+        return [
+          moveTo(p0, 16.5),
+          p1.y >= 5.0 ? (st.p1Go ? moveTo(p1, 22.5) : (m.state === 'idle' ? moveTo(p1, 12.6) : moveTo(p1, 11.2))) : moveTo(p1, 22.5),
+        ];
+      }
+      return [
+        p1.x < 26.2 ? moveTo(p0, 16.5) : moveTo(p0, doorX, { jumpIf: jBluff(p0) || jSpk(p0) }),
+        p0.x < 25.5 ? moveTo(p1, 26.5) : moveTo(p1, doorX, { jumpIf: jBluff(p1) || jSpk(p1) }),
+      ];
+    });
+    expect(g.finished).toBe(true);
+    expect(g.deaths).toBe(0);
   });
 });

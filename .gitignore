@@ -1,3 +1,14 @@
 node_modules/
 dist/
 .wrangler/
+
+# launch video: regenerable media (capture.mjs + build.mjs recreate them)
+marketing/footage/
+marketing/launch-ad/assets/footage/
+marketing/launch-ad/renders/
+marketing/launch-ad/.hyperframes/
+marketing/launch-ad/check.json
+marketing/launch-ad/render.log
+marketing/capture/*.log
+marketing/capture/probe.*
+marketing/.venv-tts/

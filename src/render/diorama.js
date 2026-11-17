@@ -45,15 +45,21 @@ export function createDiorama(scene, levels, models) {
   }
 
   const nodeMeshes = [];
+  const worldCounts = [0, 0, 0, 0, 0];
+  for (let i = 0; i < levels.length; i++) {
+    worldCounts[Math.max(0, Math.min(4, (levels[i].world ?? 1) - 1))]++;
+  }
   const perWorld = [0, 0, 0, 0, 0];
   for (let i = 0; i < levels.length; i++) {
     const w = Math.max(0, Math.min(4, (levels[i].world ?? 1) - 1));
     const padX = (w - 2) * 4.6;
     const local = perWorld[w]++;
+    const totalRows = Math.max(5, Math.ceil(worldCounts[w] / 2));
+    const rowStep = 5.0 / Math.max(4, totalRows - 1);
     const col = local % 2;
     const row = Math.floor(local / 2);
     const nx = padX + (col === 0 ? -0.95 : 0.95) + (row % 2 === 1 ? 0.28 : -0.28);
-    const nz = -2.4 + row * 1.25;
+    const nz = -2.4 + row * rowStep;
     const node = new Mesh(NODE_GEO, MAT.locked);
     node.position.set(nx, 0.36, nz);
     node.castShadow = true;

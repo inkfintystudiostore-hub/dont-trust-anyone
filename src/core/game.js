@@ -20,7 +20,7 @@ function createPlayerState() {
     jumped: false, landed: false, face: 1, stun: 0, slip: 0, slipDir: 1, slipSpeed: 8.5,
     flipped: 0, beltVx: 0, speedMul: 1, jumpMul: 1, gravDir: 1, atDoor: false, prevJump: false,
     pieTimer: 0, danceTimer: 0, magnetPull: 0, trapAnim: null, trapAnimTimer: 0,
-    _lockedNotified: false,
+    portalCd: 0, _lockedNotified: false, _shrunkNotified: false,
     hit: { bonkCx: -1, bonkCy: -1, wallCx: -1, wallCy: -1 },
   };
 }
@@ -62,24 +62,34 @@ export function restartAttempt(g) {
 function resetLevel(g) {
   const L = g.level;
   for (let i = 0; i < L.tiles.length; i++) g.solid[i] = L.tiles[i] === TILE.SOLID ? 1 : 0;
-  g.door = L.door ? { x: L.door.x, y: L.door.y, ran: false, stopIndex: 0 } : null;
+  g.door = L.door ? {
+    x: L.door.x, y: L.door.y, ran: false, stopIndex: 0,
+    shrink: !!L.door.shrink, shrunk: false, unshrunkTimer: 0,
+    shrinkRadius: L.door.shrinkRadius ?? 3.0, shrinkDuration: L.door.shrinkDuration ?? 5.0,
+  } : null;
   g.traps = L.trapDefs.map((d) => ({
     ...d, state: 'idle', timer: 0, offsetY: 0, vx: 0, vy: 0, x: d.cx + 0.5, y: d.cy, prevX: d.cx + 0.5, prevY: d.cy,
     ext: 0, hit: false, hitMask: 0, insideMask: 0, shy: false, onGround: false, face: -1,
+    homeCx: d.cx, curCx: d.cx, step: 0, swapped: d.kind === 'bluffDoor' && d.swapOnDeath && (g.levelDeaths % 2 === 1),
     revealed: false, active: false, armed: false, triggered: false, collected: false, pressed: false, open: false,
     defuse: 0, defused: false, defusing: false, cooldown: 0, stopIndex: 0, syncTimer: 0,
   }));
   g.keysTotal = 0;
   g.hasPlateA = false;
   g.hasPlateB = false;
+  g.hasWeightBridge = false;
+  g.bluffDoor = null;
   g.syncActive = false;
   g.syncLatch = 0;
   for (const t of g.traps) {
     if (t.kind === 'fallingFloor' || t.kind === 'launchFloor' || t.kind === 'antiJump' ||
         t.kind === 'invisibleBlock' || t.kind === 'conveyor' || t.kind === 'slowFloor' ||
-        t.kind === 'springTrap' || t.kind === 'discoFloor') {
+        t.kind === 'springTrap' || t.kind === 'discoFloor' || t.kind === 'weightBridge' ||
+        t.kind === 'shyPlatform' || t.kind === 'hungryFloor') {
       g.solid[t.cell] = 1;
     }
+    if (t.kind === 'weightBridge') g.hasWeightBridge = true;
+    if (t.kind === 'bluffDoor') g.bluffDoor = t;
     if (t.kind === 'keyItem') g.keysTotal++;
     if (t.kind === 'plateA') g.hasPlateA = true;
     if (t.kind === 'plateB') g.hasPlateB = true;
@@ -97,7 +107,7 @@ function resetLevel(g) {
       x: L.start.x, y: L.start.y, prevX: L.start.x, prevY: L.start.y, vx: 0, vy: 0,
       onGround: false, coyote: 0, jumpBuf: 0, jumped: false, landed: false, face: 1,
       stun: 0, slip: 0, slipDir: 1, slipSpeed: 8.5, flipped: 0, beltVx: 0, speedMul: 1, jumpMul: 1,
-      gravDir: 1, atDoor: false, prevJump: false, _lockedNotified: false,
+      gravDir: 1, atDoor: false, prevJump: false, portalCd: 0, _lockedNotified: false, _shrunkNotified: false,
       pieTimer: 0, danceTimer: 0, magnetPull: 0, trapAnim: null, trapAnimTimer: 0,
     });
     p.hit.bonkCx = -1; p.hit.bonkCy = -1; p.hit.wallCx = -1; p.hit.wallCy = -1;
@@ -139,6 +149,138 @@ function die(g, cause, trapIndex = -1, victimIndex = 0) {
   emit(g, 'death', { cause, victim: victimIndex, x: victim.x, y: victim.y });
 }
 
+function advancePlayer(g, pi, inp, dt, emitEvents) {
+  const p = g.players[pi];
+  if (!p) return;
+  p.prevX = p.x;
+  p.prevY = p.y;
+  const jumpPressed = !!inp.jump && !p.prevJump;
+  p.prevJump = !!inp.jump;
+  if (pi === 0) g.prevJump = p.prevJump;
+
+  if (p.atDoor) {
+    p.vx = 0;
+    p.vy = 0;
+    p.jumped = false;
+    p.landed = false;
+    g._wants[pi] = 0;
+    return;
+  }
+
+  const stunned = p.stun > 0;
+  p.stun = Math.max(0, p.stun - dt);
+  const slipping = p.slip > 0;
+  p.slip = Math.max(0, p.slip - dt);
+  p.flipped = Math.max(0, p.flipped - dt);
+  p.pieTimer = Math.max(0, p.pieTimer - dt);
+  p.danceTimer = Math.max(0, p.danceTimer - dt);
+  p.portalCd = Math.max(0, p.portalCd - dt);
+  p.trapAnimTimer = Math.max(0, p.trapAnimTimer - dt);
+  if (p.trapAnimTimer <= 0) p.trapAnim = null;
+  if (p.pieTimer > 0) p.speedMul *= 0.65;
+  if (p.danceTimer > 0 && p.onGround && !stunned) {
+    if (Math.floor(g.time * 8) !== Math.floor((g.time - dt) * 8)) {
+      p.vy = 4.6 * p.gravDir;
+      p.onGround = false;
+    }
+  }
+  const rawWant = Number.isFinite(inp.moveX)
+    ? Math.max(-1, Math.min(1, inp.moveX))
+    : ((inp.right ? 1 : 0) - (inp.left ? 1 : 0));
+  const want = p.flipped > 0 ? -rawWant : rawWant;
+  g._wants[pi] = want;
+  if (Math.abs(want) > 0.05 && !stunned && !slipping) p.face = want > 0 ? 1 : -1;
+  const dir = stunned ? p.vx / PHYS.move : (slipping ? p.slipDir * (p.slipSpeed / PHYS.move) : want);
+  if (stunned) { p.speedMul = 1; p.beltVx = 0; }
+  movePlayer(p, dir, jumpPressed && !stunned && !slipping, dt, g.isSolid, p.hit);
+  if (inp.down && !p.onGround && !stunned) {
+    p.vy = Math.max(-PHYS.maxFall, Math.min(PHYS.maxFall, p.vy - PHYS.gravity * 0.65 * dt * p.gravDir));
+  }
+  if (emitEvents) {
+    if (p.jumped) emit(g, 'jump', { playerIndex: pi });
+    if (p.landed) emit(g, 'land', { playerIndex: pi });
+  }
+}
+
+/** Local-only player movement prediction for co-op Guest without mutating lethal/win state. */
+export function stepPlayerLocal(g, playerIndex, inp, dt, opts = null) {
+  if (g.finished || g.dead) return;
+  const clampedDt = Math.min(dt, 1 / 30);
+  advancePlayer(g, playerIndex, inp ?? IDLE_IN, clampedDt, false);
+  if (opts?.predictTraps) {
+    predictGuestTrapsLocal(g, playerIndex, clampedDt);
+  }
+}
+
+/** Predicts Guest-triggered pop-up/floor traps locally so traps appear with 0ms lag. */
+function predictGuestTrapsLocal(g, playerIndex, dt) {
+  const p = g.players?.[playerIndex];
+  if (!p || p.atDoor) return;
+  for (let i = 0; i < g.traps.length; i++) {
+    const t = g.traps[i];
+    switch (t.kind) {
+      case 'fallingFloor':
+        if (t.state === 'idle' && standingOn(p, t.cx, t.cy)) {
+          t.state = 'shaking';
+          t.timer = t.delay;
+        } else if (t.state === 'shaking' && (t.timer -= dt) <= 0) {
+          t.state = 'falling';
+          g.solid[t.cell] = 0;
+        } else if (t.state === 'falling') {
+          t.vy -= PHYS.gravity * dt;
+          t.offsetY += t.vy * dt;
+        }
+        break;
+      case 'launchFloor':
+        if (t.state === 'idle' && standingOn(p, t.cx, t.cy)) {
+          t.state = 'shaking';
+          t.timer = t.delay;
+        } else if (t.state === 'shaking' && (t.timer -= dt) <= 0) {
+          t.state = 'launching';
+          g.solid[t.cell] = 0;
+        } else if (t.state === 'launching') {
+          t.offsetY += 16 * dt;
+        }
+        break;
+      case 'invisibleBlock':
+        if (!t.revealed && ((p.hit.bonkCx === t.cx && p.hit.bonkCy === t.cy) || (p.hit.wallCx === t.cx && p.hit.wallCy === t.cy))) {
+          t.revealed = true;
+          p.vx = 0;
+          p.vy = p.gravDir > 0 ? Math.min(p.vy, -4) : Math.max(p.vy, 4);
+          p.stun = STUN;
+          p.slip = 0;
+          p.trapAnim = 'bonk';
+          p.trapAnimTimer = STUN;
+        }
+        break;
+      case 'hiddenSpikes':
+        if (!t.armed) {
+          if (Math.abs(p.x - (t.cx + 0.5)) < t.radius && Math.abs(p.y - t.cy) < 2) {
+            t.armed = true;
+            t.timer = t.delay;
+          }
+        } else if (!t.active && (t.timer -= dt) <= 0) {
+          t.active = true;
+        }
+        break;
+      case 'antiJump':
+        if (!t.active && p.jumped && Math.abs(p.x - (t.cx + 0.5)) < t.radius && Math.abs(p.y - t.cy) < 3) {
+          t.active = true;
+        }
+        break;
+      case 'plateA':
+      case 'plateB':
+      case 'syncPlate':
+        if (p.onGround && p.x + PHYS.halfW > t.cx + 0.08 && p.x - PHYS.halfW < t.cx + 0.92 && Math.abs(p.y - t.cy) < 0.45) {
+          t.pressed = true;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+}
+
 export function step(g, inputOrInputs, dt) {
   g.events.length = 0;
   dt = Math.min(dt, 1 / 30);
@@ -158,68 +300,59 @@ export function step(g, inputOrInputs, dt) {
   }
 
   for (let pi = 0; pi < g.players.length; pi++) {
-    const p = g.players[pi];
-    const inp = pi === 0 ? in0 : in1;
-    p.prevX = p.x;
-    p.prevY = p.y;
-    const jumpPressed = !!inp.jump && !p.prevJump;
-    p.prevJump = !!inp.jump;
-    if (pi === 0) g.prevJump = p.prevJump;
-
-    if (p.atDoor) {
-      p.vx = 0;
-      p.vy = 0;
-      p.jumped = false;
-      p.landed = false;
-      g._wants[pi] = 0;
-      continue;
-    }
-
-    const stunned = p.stun > 0;
-    p.stun = Math.max(0, p.stun - dt);
-    const slipping = p.slip > 0;
-    p.slip = Math.max(0, p.slip - dt);
-    p.flipped = Math.max(0, p.flipped - dt);
-    p.pieTimer = Math.max(0, p.pieTimer - dt);
-    p.danceTimer = Math.max(0, p.danceTimer - dt);
-    p.trapAnimTimer = Math.max(0, p.trapAnimTimer - dt);
-    if (p.trapAnimTimer <= 0) p.trapAnim = null;
-    if (p.pieTimer > 0) p.speedMul *= 0.65;
-    if (p.danceTimer > 0 && p.onGround && !stunned) {
-      if (Math.floor(g.time * 8) !== Math.floor((g.time - dt) * 8)) {
-        p.vy = 4.6 * p.gravDir;
-        p.onGround = false;
-      }
-    }
-    const rawWant = Number.isFinite(inp.moveX)
-      ? Math.max(-1, Math.min(1, inp.moveX))
-      : ((inp.right ? 1 : 0) - (inp.left ? 1 : 0));
-    const want = p.flipped > 0 ? -rawWant : rawWant;
-    g._wants[pi] = want;
-    if (Math.abs(want) > 0.05 && !stunned && !slipping) p.face = want > 0 ? 1 : -1;
-    const dir = stunned ? p.vx / PHYS.move : (slipping ? p.slipDir * (p.slipSpeed / PHYS.move) : want);
-    if (stunned) { p.speedMul = 1; p.beltVx = 0; }
-    movePlayer(p, dir, jumpPressed && !stunned && !slipping, dt, g.isSolid, p.hit);
-    if (inp.down && !p.onGround && !stunned) {
-      p.vy = Math.max(-PHYS.maxFall, Math.min(PHYS.maxFall, p.vy - PHYS.gravity * 0.65 * dt * p.gravDir));
-    }
-    if (p.jumped) emit(g, 'jump', { playerIndex: pi });
-    if (p.landed) emit(g, 'land', { playerIndex: pi });
+    advancePlayer(g, pi, pi === 0 ? in0 : in1, dt, true);
   }
 
   updateTraps(g, dt);
   checkHazards(g);
 
   if (!g.dead && g.door && !hasPendingDoorRun(g)) {
+    if (g.door.shrink) {
+      if (g.channelA) {
+        g.door.unshrunkTimer = g.door.shrinkDuration;
+        g.door.shrunk = false;
+      } else if (g.door.unshrunkTimer > 0) {
+        g.door.unshrunkTimer = Math.max(0, g.door.unshrunkTimer - dt);
+        g.door.shrunk = false;
+      } else {
+        const near = g.players.some((p) => !p.atDoor && Math.hypot(p.x - g.door.x, p.y - g.door.y) <= g.door.shrinkRadius);
+        g.door.shrunk = near;
+      }
+    }
+    const bluff = g.bluffDoor;
+    const swapped = !!(bluff && bluff.swapped);
+    const realDoor = swapped ? { x: bluff.cx + 0.5, y: bluff.cy } : g.door;
+    const fakeDoorPos = bluff ? (swapped ? g.door : { x: bluff.cx + 0.5, y: bluff.cy }) : null;
+    if (fakeDoorPos) {
+      for (let pi = 0; pi < g.players.length; pi++) {
+        const p = g.players[pi];
+        if (!p.atDoor && overlaps(p, fakeDoorPos.x - 0.35, fakeDoorPos.y, fakeDoorPos.x + 0.35, fakeDoorPos.y + 1.2)) {
+          p.x = g.level.start.x;
+          p.y = g.level.start.y;
+          p.vx = 0;
+          p.vy = 0;
+          p.stun = 0.25;
+          emit(g, 'doorBluff', { playerIndex: pi, x: fakeDoorPos.x, y: fakeDoorPos.y });
+        }
+      }
+    }
     const locked = g.keysLeft > 0 || hasUndefusedBomb(g);
+    const shrunk = !swapped && !!g.door.shrunk;
     for (let pi = 0; pi < g.players.length; pi++) {
       const p = g.players[pi];
       if (p.atDoor) continue;
-      if (overlaps(p, g.door.x - 0.35, g.door.y, g.door.x + 0.35, g.door.y + 1.2)) {
+      if (overlaps(p, realDoor.x - 0.35, realDoor.y, realDoor.x + 0.35, realDoor.y + 1.2)) {
         if (locked) {
           if (!p._lockedNotified) {
             p._lockedNotified = true;
             emit(g, 'doorLocked', { playerIndex: pi, keysLeft: g.keysLeft });
+          }
+          continue;
+        }
+        if (shrunk) {
+          if (!p._shrunkNotified) {
+            p._shrunkNotified = true;
+            emit(g, 'doorShrunk', { playerIndex: pi, x: realDoor.x, y: realDoor.y });
           }
           continue;
         }
@@ -230,12 +363,13 @@ export function step(g, inputOrInputs, dt) {
         p.atDoor = true;
         p.vx = 0;
         p.vy = 0;
-        emit(g, 'doorWait', { playerIndex: pi, x: g.door.x, y: g.door.y });
+        emit(g, 'doorWait', { playerIndex: pi, x: realDoor.x, y: realDoor.y });
       } else {
         p._lockedNotified = false;
+        p._shrunkNotified = false;
       }
     }
-    if (!locked && g.coop && g.players.every((p) => p.atDoor)) win(g);
+    if (!locked && !shrunk && g.coop && g.players.every((p) => p.atDoor)) win(g);
   }
   return g.events;
 }
@@ -280,6 +414,15 @@ function updateTraps(g, dt) {
   g.channelB = false;
   let syncCount = 0;
   let syncReady = 0;
+  let weightRiders = 0;
+  if (g.hasWeightBridge) {
+    for (let pi = 0; pi < players.length; pi++) {
+      const p = players[pi];
+      if (g.traps.some((wt) => wt.kind === 'weightBridge' && wt.state !== 'fallen' && standingOn(p, wt.cx, wt.cy))) {
+        weightRiders++;
+      }
+    }
+  }
   for (let i = 0; i < g.traps.length; i++) {
     const t = g.traps[i];
     if (t.kind === 'syncPlate') {
@@ -1002,6 +1145,132 @@ function updateTraps(g, dt) {
         }
         break;
       }
+      case 'weightBridge': {
+        if (t.state === 'idle') {
+          if (weightRiders >= 2) {
+            t.state = 'shaking';
+            t.timer = t.delay;
+            emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 });
+          }
+        } else if (t.state === 'shaking') {
+          t.timer -= dt;
+          if (t.timer <= 0) {
+            t.state = 'fallen';
+            g.solid[t.cell] = 0;
+            t.timer = t.respawn;
+          }
+        } else if (t.state === 'fallen') {
+          t.timer -= dt;
+          if (t.timer <= 0 && !players.some((p) => overlaps(p, t.cx, t.cy, t.cx + 1, t.cy + 1))) {
+            t.state = 'idle';
+            g.solid[t.cell] = 1;
+          }
+        }
+        break;
+      }
+      case 'countdownLie': {
+        if (t.state === 'idle') {
+          if (players.some((p) => !p.atDoor && Math.abs(p.x - (t.cx + 0.5)) <= t.triggerDist)) {
+            t.state = 'counting';
+            t.step = 3;
+            t.timer = t.stepTime;
+            emit(g, 'countdown', { text: '3...', step: 3, x: t.cx + 0.5, y: t.cy + 1 });
+          }
+        } else if (t.state === 'counting') {
+          t.timer -= dt;
+          if (t.timer <= 0) {
+            t.step--;
+            t.timer = t.stepTime;
+            if (t.step === 2) emit(g, 'countdown', { text: '2...', step: 2, x: t.cx + 0.5, y: t.cy + 1 });
+            else if (t.step === 1) emit(g, 'countdown', { text: '1...', step: 1, x: t.cx + 0.5, y: t.cy + 1 });
+            else {
+              emit(g, 'countdown', { text: 'GO!', step: 0, x: t.cx + 0.5, y: t.cy + 1 });
+              t.state = 'done';
+            }
+          }
+        }
+        break;
+      }
+      case 'shyPlatform': {
+        const L = g.level;
+        if (t.state === 'idle') {
+          const jumpingNear = players.some((p) => !p.atDoor && (p.jumped || (!p.onGround && p.vy > 0)) && Math.abs(p.x - (t.homeCx + 0.5)) <= t.triggerDist);
+          if (jumpingNear) {
+            const targetCx = Math.max(0, Math.min(L.W - 1, t.homeCx + t.shift));
+            if (targetCx !== t.curCx) {
+              g.solid[t.cy * L.W + t.curCx] = 0;
+              t.curCx = targetCx;
+              g.solid[t.cy * L.W + t.curCx] = 1;
+              t.x = t.curCx + 0.5;
+              t.state = 'shifted';
+              t.timer = 0.4;
+              emit(g, 'trap', { kind: t.kind, x: t.x, y: t.cy + 0.5 });
+            }
+          }
+        } else if (t.state === 'shifted') {
+          t.timer = Math.max(0, t.timer - dt);
+          if (t.timer <= 0 && players.every((p) => p.onGround || p.atDoor) &&
+              !players.some((p) => !p.atDoor && Math.abs(p.x - (t.curCx + 0.5)) < 1.8 && Math.abs(p.y - (t.cy + 1)) < 1.2)) {
+            g.solid[t.cy * L.W + t.curCx] = 0;
+            t.curCx = t.homeCx;
+            g.solid[t.cy * L.W + t.curCx] = 1;
+            t.x = t.curCx + 0.5;
+            t.state = 'idle';
+          }
+        }
+        break;
+      }
+      case 'hungryFloor': {
+        if (t.state === 'idle') {
+          const standing = players.some((p) => standingOn(p, t.cx, t.cy));
+          if (standing) {
+            t.timer += dt;
+            if (t.timer >= t.delay) {
+              t.state = 'chomp';
+              t.cooldown = 0.6;
+              for (let pi = 0; pi < players.length; pi++) {
+                const p = players[pi];
+                if (standingOn(p, t.cx, t.cy)) {
+                  if (t.spitUp) {
+                    p.vy = 14 * p.gravDir;
+                    p.onGround = false;
+                  } else {
+                    p.x = g.level.start.x;
+                    p.y = g.level.start.y;
+                    p.vx = 0;
+                    p.vy = 0;
+                    p.stun = 0.25;
+                  }
+                }
+              }
+              emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 });
+            }
+          } else {
+            t.timer = 0;
+          }
+        } else if (t.state === 'chomp') {
+          t.cooldown -= dt;
+          if (t.cooldown <= 0) {
+            t.state = 'idle';
+            t.timer = 0;
+          }
+        }
+        break;
+      }
+      case 'portalWall': {
+        for (let pi = 0; pi < players.length; pi++) {
+          const p = players[pi];
+          if (!p.atDoor && p.portalCd <= 0 && overlaps(p, t.cx - 0.08, t.cy, t.cx + 1.08, t.cy + 1.05)) {
+            p.x = t.to ? t.to.x : 1.5;
+            p.y = t.to ? t.to.y : t.cy;
+            p.vx = 0;
+            p.vy = 0;
+            p.portalCd = 0.35;
+            emit(g, 'trap', { kind: t.kind, x: p.x, y: p.y });
+          }
+        }
+        break;
+      }
       default: break;
     }
   }
@@ -1050,8 +1319,8 @@ function win(g) {
 }
 
 /** Compact JSON-safe state snapshot broadcast from Host (P1) to Guest (P2) in 2P co-op. */
-export function exportCoopSnapshot(g) {
-  return {
+export function exportCoopSnapshot(g, meta = null) {
+  const snap = {
     levelIndex: g.levelIndex,
     time: g.time,
     darkTimer: g.darkTimer,
@@ -1071,22 +1340,36 @@ export function exportCoopSnapshot(g) {
     players: g.players.map((p) => ({
       x: p.x, y: p.y, vx: p.vx, vy: p.vy, face: p.face, gravDir: p.gravDir,
       onGround: p.onGround, stun: p.stun, slip: p.slip, slipDir: p.slipDir,
-      flipped: p.flipped, atDoor: p.atDoor,
+      flipped: p.flipped, atDoor: p.atDoor, beltVx: p.beltVx, speedMul: p.speedMul,
       pieTimer: p.pieTimer, danceTimer: p.danceTimer, magnetPull: p.magnetPull,
       trapAnim: p.trapAnim, trapAnimTimer: p.trapAnimTimer,
     })),
-    traps: g.traps.map((t) => ({
-      state: t.state, offsetY: t.offsetY, x: t.x, y: t.y, ext: t.ext, vx: t.vx,
-      face: t.face, shy: t.shy, onGround: t.onGround, revealed: t.revealed,
-      active: t.active, triggered: t.triggered, collected: t.collected, pressed: t.pressed,
-      open: t.open, defuse: t.defuse, defused: t.defused, defusing: t.defusing,
-      timer: t.timer, stopIndex: t.stopIndex,
-    })),
+    traps: g.traps.reduce((acc, t, i) => {
+      const active = t.kind === 'boulder' || t.kind === 'crusher' || t.kind === 'boxingGlove'
+        || (t.state !== undefined && t.state !== 'idle')
+        || t.offsetY !== 0 || t.ext !== 0 || t.revealed || t.active || t.triggered
+        || t.collected || t.pressed || t.open || t.defused || t.defusing || (t.timer ?? 0) > 0;
+      if (!active) return acc;
+      acc.push({
+        i,
+        state: t.state, offsetY: t.offsetY, x: t.x, y: t.y, ext: t.ext, vx: t.vx,
+        face: t.face, shy: t.shy, onGround: t.onGround, revealed: t.revealed,
+        active: t.active, triggered: t.triggered, collected: t.collected, pressed: t.pressed,
+        open: t.open, defuse: t.defuse, defused: t.defused, defusing: t.defusing,
+        timer: t.timer, stopIndex: t.stopIndex,
+      });
+      return acc;
+    }, []),
   };
+  if (meta) {
+    if (Number.isFinite(meta.simTick)) snap.simTick = meta.simTick;
+    if (Number.isFinite(meta.ackSeq)) snap.ackSeq = meta.ackSeq;
+  }
+  return snap;
 }
 
 /** Applies a Host snapshot onto the Guest simulation state without discarding smooth interpolation anchors. */
-export function applyCoopSnapshot(g, snap) {
+export function applyCoopSnapshot(g, snap, opts = null) {
   if (!snap) return { levelChanged: false, respawned: false };
   const levelChanged = snap.levelIndex !== g.levelIndex;
   const wasDead = g.dead;
@@ -1108,24 +1391,67 @@ export function applyCoopSnapshot(g, snap) {
   g.levelDeaths = snap.levelDeaths;
   g.finished = snap.finished;
   if (snap.door && g.door) Object.assign(g.door, snap.door);
+  const predictIdx = opts?.predictPlayerIndex ?? -1;
+  const snapAlpha = Number.isFinite(opts?.snapAlpha) ? Math.max(0, Math.min(1, opts.snapAlpha)) : 1;
   if (Array.isArray(snap.players)) {
     for (let i = 0; i < Math.min(g.players.length, snap.players.length); i++) {
       const dst = g.players[i];
       const src = snap.players[i];
-      const teleported = respawned || Math.hypot(src.x - dst.x, src.y - dst.y) > 2.5;
-      const anchorX = teleported ? src.x : dst.x;
-      const anchorY = teleported ? src.y : dst.y;
-      Object.assign(dst, src);
-      dst.prevX = anchorX;
-      dst.prevY = anchorY;
+      if (i === predictIdx && opts?.skipPredictPlayer && !respawned && !g.dead && !src.atDoor) {
+        continue;
+      }
+      const err = Math.hypot(src.x - dst.x, src.y - dst.y);
+      const localAir = !dst.onGround && src.onGround && (dst.vy * dst.gravDir > 0.5 || Math.abs(dst.y - src.y) > 0.25);
+      const maxPredictErr = localAir ? 2.5 : 2.2;
+      if (i === predictIdx && !respawned && !g.dead && !src.atDoor && err < maxPredictErr) {
+        dst.prevX = dst.x;
+        dst.prevY = dst.y;
+        const dx = src.x - dst.x;
+        if (Math.abs(dx) > 0.35 || Math.abs(dst.vx) < 0.1) {
+          dst.x += dx * 0.1;
+        }
+        if (!localAir) {
+          const dy = src.y - dst.y;
+          if (Math.abs(dy) > 0.25 || (dst.onGround && src.onGround)) {
+            dst.y += dy * 0.15;
+          }
+          if (dst.onGround && src.onGround) {
+            dst.vy = src.vy;
+            dst.onGround = src.onGround;
+          }
+        }
+        dst.gravDir = src.gravDir;
+        dst.stun = src.stun;
+        dst.slip = src.slip;
+        dst.slipDir = src.slipDir;
+        dst.flipped = src.flipped;
+        dst.beltVx = src.beltVx ?? 0;
+        dst.speedMul = src.speedMul ?? 1;
+        dst.pieTimer = src.pieTimer;
+        dst.danceTimer = src.danceTimer;
+        dst.magnetPull = src.magnetPull;
+        dst.trapAnim = src.trapAnim;
+        dst.trapAnimTimer = src.trapAnimTimer;
+      } else {
+        const teleported = respawned || err > 2.5;
+        const curX = dst.prevX + (dst.x - dst.prevX) * snapAlpha;
+        const curY = dst.prevY + (dst.y - dst.prevY) * snapAlpha;
+        const anchorX = teleported ? src.x : curX;
+        const anchorY = teleported ? src.y : curY;
+        Object.assign(dst, src);
+        dst.prevX = anchorX;
+        dst.prevY = anchorY;
+      }
       dst.jumped = false;
       dst.landed = false;
     }
   }
   if (Array.isArray(snap.traps)) {
-    for (let i = 0; i < Math.min(g.traps.length, snap.traps.length); i++) {
-      const dst = g.traps[i];
-      const src = snap.traps[i];
+    for (let idx = 0; idx < snap.traps.length; idx++) {
+      const src = snap.traps[idx];
+      const ti = Number.isInteger(src?.i) ? src.i : idx;
+      const dst = g.traps[ti];
+      if (!dst || !src) continue;
       const teleported = respawned || (src.x !== undefined && Math.hypot(src.x - dst.x, (src.y ?? dst.y) - dst.y) > 2.5);
       const anchorX = teleported ? (src.x ?? dst.x) : dst.x;
       const anchorY = teleported ? (src.y ?? dst.y) : dst.y;

@@ -1,6 +1,12 @@
 import { Group, Mesh, MeshStandardMaterial, SphereGeometry, Box3 } from 'three';
 import { PHYS } from '../core/physics.js';
 
+const EYE_MAT = new MeshStandardMaterial({ color: '#1f1916', roughness: 0.3 });
+const SHINE_MAT = new MeshStandardMaterial({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.6 });
+const EYE_GEO = new SphereGeometry(0.075, 16, 12);
+const SHINE_GEO = new SphereGeometry(0.022, 8, 6);
+const damp = (rate, dt) => 1 - Math.exp(-rate * dt);
+
 /**
  * Momo/Mimi = Meshy body + code eyes (blink, wide surprise, velocity lag, sleepy)
  * + dt-independent squash/stretch and hilarious per-trap/death character animations.
@@ -21,17 +27,13 @@ export function createMomo(bodyTemplate) {
   const box = new Box3().setFromObject(body);
   const h = box.max.y;
   const frontZ = box.max.z;
-  const eyeMat = new MeshStandardMaterial({ color: '#1f1916', roughness: 0.3 });
-  const shineMat = new MeshStandardMaterial({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.6 });
-  const eyeGeo = new SphereGeometry(0.075, 16, 12);
-  const shineGeo = new SphereGeometry(0.022, 8, 6);
   const eyes = new Group();
   const eyeList = [];
   for (const sx of [-1, 1]) {
-    const eye = new Mesh(eyeGeo, eyeMat);
+    const eye = new Mesh(EYE_GEO, EYE_MAT);
     eye.position.set(sx * 0.14, 0, 0);
     eye.scale.set(1, 1.25, 0.55);
-    const shine = new Mesh(shineGeo, shineMat);
+    const shine = new Mesh(SHINE_GEO, SHINE_MAT);
     shine.position.set(0.025, 0.035, 0.04);
     eye.add(shine);
     eyes.add(eye);
@@ -76,7 +78,6 @@ export function createMomo(bodyTemplate) {
     update(p, dt, t, dead = false, alpha = 1, z = 0) {
       const rx = p.prevX + (p.x - p.prevX) * alpha;
       const ry = p.prevY + (p.y - p.prevY) * alpha;
-      const k = (rate) => 1 - Math.exp(-rate * dt);
 
       if (dead) {
         deathElapsed += dt;
@@ -127,12 +128,12 @@ export function createMomo(bodyTemplate) {
       group.position.set(rx, ry, z);
 
       const targetFlip = (p.gravDir ?? 1) < 0 ? Math.PI : 0;
-      flipAngle += (targetFlip - flipAngle) * k(14);
+      flipAngle += (targetFlip - flipAngle) * damp(14, dt);
       flipPivot.rotation.z = flipAngle;
 
       if (p.landed) squash = 0.72;
       if (p.jumped) squash = -0.72;
-      squash += (0 - squash) * k(10);
+      squash += (0 - squash) * damp(10, dt);
 
       const moving = p.onGround && Math.abs(p.vx) > 0.5;
       idleTime = (!moving && p.onGround && p.stun <= 0 && p.slip <= 0 && !p.trapAnim) ? idleTime + dt : 0;
@@ -148,7 +149,7 @@ export function createMomo(bodyTemplate) {
       let sy = Math.max(0.55, 1 - s * 0.28 + bob);
       let sz = 1 + s * 0.22;
 
-      lean += ((p.vx / PHYS.move) * 0.18 - lean) * k(10);
+      lean += ((p.vx / PHYS.move) * 0.18 - lean) * damp(10, dt);
       let rotZ = -lean;
       let targetYaw = p.face > 0 ? 0.36 : -0.36;
       const anim = p.trapAnim;
@@ -194,7 +195,7 @@ export function createMomo(bodyTemplate) {
 
       pivot.scale.set(sx, sy, sz);
       pivot.rotation.z = rotZ;
-      pivot.rotation.y += (targetYaw - pivot.rotation.y) * k(16);
+      pivot.rotation.y += (targetYaw - pivot.rotation.y) * damp(16, dt);
 
       nextBlink -= dt;
       if (nextBlink <= 0) { blink = 0.12; nextBlink = 2 + Math.random() * 2.5; }

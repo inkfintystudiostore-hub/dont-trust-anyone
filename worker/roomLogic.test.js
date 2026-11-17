@@ -128,4 +128,24 @@ describe('worker 2-player co-op room state machine', () => {
     bothOff = disconnectPlayer(bothOff, 'p2', 11_000);
     expect(getRoomCloseReason(bothOff, 10_000 + 30_000)).toBe('both_left');
   });
+
+  it('relays sanitized co-op chat messages and ignores blank ones', () => {
+    let room = createRoomRecord('482910375', 0, 1000);
+    room = joinRoom(room, 'p1', 'HostBro', 1000, 'dev-1');
+    room = joinRoom(room, 'p2', 'MimiSis', 1100, 'dev-2');
+
+    const blank = handleRoomAction(room, 'p1', { type: 'chat', text: '   \n  ' }, 1200);
+    expect(blank.relayToOthers).toHaveLength(0);
+
+    const longText = 'a'.repeat(150);
+    const sent = handleRoomAction(room, 'p2', { type: 'chat', text: `  ${longText}  ` }, 1300);
+    expect(sent.relayToOthers).toHaveLength(1);
+    expect(sent.relayToOthers[0]).toMatchObject({
+      type: 'chat',
+      fromSeat: 1,
+      senderName: 'MimiSis',
+      text: 'a'.repeat(120),
+      at: 1300,
+    });
+  });
 });

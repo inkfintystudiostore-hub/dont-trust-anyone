@@ -521,4 +521,138 @@ describe('every level is beatable', () => {
     ]);
     expect(g.deaths).toBe(0);
   });
+
+  // World 4 Expansion (L43-L54, indices 35-46)
+  it('L43: ignore countdown lie, bait crusher, jump gap, banana peel and hidden spikes', () => {
+    const g = play(35, [
+      { dir: 1, until: (p) => p.x >= 10.6 },
+      { dir: 0, until: (_, gg) => { const m = gg.traps.find((t) => t.kind === 'crusher'); return m.state === 'rising'; } },
+      { dir: 1, jumpAt: (p) => p.x >= 12.2, until: landedPast(14.5) },
+      { dir: 1, holdJump: true, jumpAt: (p) => p.x >= 17.4, until: landedPast(22.2) },
+      { dir: 1, jumpAt: (p) => p.x >= 23.0, until: landedPast(26.0) },
+      { dir: 1, holdJump: true, jumpAt: (p) => p.x >= 27.2, until: won },
+    ]);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L44: bounce rubber chicken to H plate, dodge boxing glove, jump conveyor & falling tile', () => {
+    const g = play(36, [
+      { dir: 1, until: (p) => p.onGround && p.y >= 3.5 },
+      { dir: -1, until: (_, gg) => gg.door.unshrunkTimer > 0 },
+      { dir: -1, until: (p) => p.onGround && p.y < 3.0 },
+      { dir: 1, jumpAt: (p) => p.x >= 11.4, until: landedPast(15.0) },
+      { dir: 1, jumpAt: (p) => p.x >= 16.5, until: landedPast(20.5) },
+      { dir: 1, holdJump: true, jumpAt: (p) => p.x >= 26.8, until: won },
+    ]);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L45: short-hop two shy platforms, jump fakeDoor, banana peel, and hidden spikes', () => {
+    const g = play(37, [
+      { dir: 1, jumpAt: (p) => p.x >= 5.2, until: landedPast(11.8) },
+      { dir: 1, jumpAt: (p) => p.x >= 12.1, until: landedPast(15.2) },
+      { dir: 1, jumpAt: (p) => p.x >= 15.3, until: landedPast(17.5) },
+      { dir: 1, holdJump: true, jumpAt: (p) => p.x >= 17.6, until: landedPast(24.0) },
+      { dir: 1, jumpAt: (p) => p.x >= 26.0, until: won },
+    ]);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L46: run across hungry floor, jump rubber chicken & banana peel, bait crusher to exit', () => {
+    const g = play(38, [
+      { dir: 1, jumpAt: (p) => p.x >= 12.0, until: landedPast(15.5) },
+      { dir: 1, holdJump: true, jumpAt: (p) => p.x >= 18.4, until: (p) => p.x >= 24.5 && p.onGround },
+      { dir: 0, until: (_, gg) => { const m = gg.traps.find((t) => t.kind === 'crusher'); return m.state === 'rising'; } },
+      { dir: 1, until: won },
+    ]);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L47: skip bluff door, jump ghost pit to H plate, unshrink door, jump hidden spikes', () => {
+    const g = play(39, [
+      { dir: 1, jumpAt: (p) => p.x >= 5.0, until: landedPast(8.8) },
+      { dir: 1, holdJump: true, jumpAt: (p) => p.x >= 9.0, until: (p) => p.onGround && p.y >= 3.5 },
+      { dir: 1, until: (_, gg) => gg.door.unshrunkTimer > 0 },
+      { dir: 1, jumpAt: (p) => p.x >= 21.0, until: won },
+    ]);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L48: jump banana peel and boulder, portal warp, jump falling tiles and hidden spikes', () => {
+    const g = play(40, [
+      { dir: 1, jumpAt: (p) => p.x >= 8.8, until: landedPast(12.2) },
+      { dir: 1, holdJump: true, jumpAt: (p, gg) => { const b = gg.traps.find((t) => t.kind === 'boulder'); return b && b.state === 'rolling' && b.x - p.x < 3.0 && b.x > p.x; }, until: (p) => p.y >= 6.0 && p.x < 5.0 },
+      { dir: 1, holdJump: true, jumpAt: (p) => p.x >= 6.4, until: landedPast(11.5) },
+      { dir: 1, jumpAt: (p) => p.x >= 13.0, until: won },
+    ]);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L49: skip bluff door, jump rubber chicken & ghost bridge, jump spikes and falling floor', () => {
+    const g = play(41, [
+      { dir: 1, jumpAt: (p) => p.x >= 3.2, until: landedPast(6.5) },
+      { dir: 1, until: (p) => p.onGround && p.y >= 3.5 && p.x >= 11.0 },
+      { dir: 1, until: (p) => p.onGround && p.y < 3.0 && p.x >= 15.0 },
+      { dir: 1, jumpAt: (p) => p.x >= 19.0, until: landedPast(22.5) },
+      { dir: 1, jumpAt: (p) => p.x >= 25.8, until: won },
+    ]);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L50: jump banana peel across conveyor & hungry floor into portal, jump falling floor & spikes', () => {
+    const g = play(42, [
+      { dir: 1, jumpAt: (p) => p.x >= 5.2, until: landedPast(10.5) },
+      { dir: 1, until: (p) => p.y >= 6.0 && p.x < 5.0 },
+      { dir: 1, jumpAt: (p) => p.x >= 9.0, until: landedPast(13.2) },
+      { dir: 1, holdJump: true, jumpAt: (p) => p.x >= 15.8, until: won },
+    ]);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L51: first shy platform, wait out controlsFlip (U), second shy platform, jump spikes & falling floor', () => {
+    const g = play(43, [
+      { dir: 1, jumpAt: (p) => p.x >= 5.2, until: landedPast(11.5) },
+      { dir: 1, until: (p) => p.flipped > 0 },
+      { dir: 0, until: (p) => p.flipped <= 0 },
+      { dir: 1, jumpAt: (p) => p.x >= 15.2, until: landedPast(19.5) },
+      { dir: 1, jumpAt: (p) => p.x >= 20.0, until: landedPast(23.5) },
+      { dir: 1, jumpAt: (p) => p.x >= 27.0, until: won },
+    ]);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L52: Chai Break — jump two scenic gaps and run across hungry floor to door', () => {
+    const g = play(44, [
+      { dir: 1, jumpAt: (p) => p.x >= 3.8, until: landedPast(7.5) },
+      { dir: 1, jumpAt: (p) => p.x >= 14.8, until: won },
+    ]);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L53: bounce rubber chicken to H plate, jump banana peel, pie cannon, and falling floor', () => {
+    const g = play(45, [
+      { dir: 1, until: (p) => p.onGround && p.y >= 4.5 },
+      { dir: 1, until: (_, gg) => gg.door.unshrunkTimer > 0 },
+      { dir: 1, until: (p) => p.onGround && p.y < 3.0 && p.x >= 12.8 },
+      { dir: 1, jumpAt: (p) => p.x >= 15.6, until: landedPast(18.5) },
+      { dir: 1, holdJump: true, jumpAt: (p, gg) => { const pie = gg.traps.find((t) => t.kind === 'pieCannon'); return pie && pie.state === 'flying' && pie.x - p.x < 2.5 && pie.x > p.x; }, until: landedPast(24.0) },
+      { dir: 1, jumpAt: (p) => p.x >= 27.0, until: won },
+    ]);
+    expect(g.deaths).toBe(0);
+  });
+
+  it('L54: Glitch King Finale — shy platform, banana, falling floor, boxing glove, portal, bluff door, ghost bridge, crusher, spikes', () => {
+    const g = play(46, [
+      { dir: 1, holdJump: true, jumpAt: (p) => p.x >= 5.6, until: landedPast(11.5) },
+      { dir: 1, jumpAt: (p) => p.x >= 12.0, until: landedPast(15.5) },
+      { dir: 1, holdJump: true, jumpAt: (p) => p.x >= 23.0, until: landedPast(31.5) },
+      { dir: 1, holdJump: true, jumpAt: (p) => p.x >= 41.0, until: (p) => p.y >= 6.0 && p.x < 5.0 },
+      { dir: 1, jumpAt: (p) => p.x >= 5.0, until: landedPast(8.5) },
+      { dir: 1, holdJump: true, jumpAt: (p) => p.x >= 9.7, until: landedPast(15.0) },
+      { dir: 1, until: (p) => p.x >= 19.5 },
+      { dir: 0, until: (_, gg) => { const m = gg.traps.find((t) => t.kind === 'crusher'); return m.state === 'rising'; } },
+      { dir: 1, holdJump: true, jumpAt: (p) => p.x >= 34.8, until: won },
+    ]);
+    expect(g.deaths).toBe(0);
+  });
 });

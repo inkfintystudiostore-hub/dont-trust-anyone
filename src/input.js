@@ -6,6 +6,7 @@ const touch = { left: false, right: false, moveX: 0, down: false, jump: false, r
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 let resetTouchFn = () => {};
+let jumpLatched = false;
 
 /** Clears any active virtual joystick or touch button hold (e.g., on modal/menu transitions). */
 export function clearTouchInput() {
@@ -30,7 +31,8 @@ export function pollGamepad() {
   input.left = keys.left || pad.left || touch.left;
   input.right = keys.right || pad.right || touch.right;
   input.down = keys.down || pad.down || touch.down;
-  input.jump = keys.jump || pad.jump || touch.jump;
+  input.jump = keys.jump || pad.jump || touch.jump || jumpLatched;
+  jumpLatched = false;
   input.restart = keys.restart || pad.restart || touch.restart;
   const keyMove = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
   input.moveX = keyMove !== 0 ? keyMove : (Math.abs(touch.moveX) > 0.01 ? touch.moveX : pad.moveX);
@@ -80,10 +82,12 @@ export function bindInput(onFirstInput) {
   };
 
   addEventListener('keydown', (e) => {
+    if (e.target.closest?.('input, textarea, select')) return;
     const k = KEYS[e.code];
     if (!k) return;
     if (e.target.closest?.('button') && e.code === 'Space') return; // let Space press focused menu buttons
     e.preventDefault();
+    if (k === 'jump' && !keys.jump) jumpLatched = true;
     keys[k] = true;
     kick();
   });
@@ -160,6 +164,7 @@ export function bindInput(onFirstInput) {
       enableTouchUI();
       btnPointers.set(k, e.pointerId);
       b.setPointerCapture?.(e.pointerId);
+      if (k === 'jump') jumpLatched = true;
       touch[k] = true;
       b.classList.add('on');
       kick();

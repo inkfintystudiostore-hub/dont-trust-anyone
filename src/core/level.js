@@ -54,6 +54,12 @@ const TRAP_BUILDERS = {
   '$': (base, cfg) => ({ kind: 'pieCannon', ...base, dir: cfg.dir ?? -1, range: cfg.range ?? cfg.triggerDist ?? 5.8, speed: cfg.speed ?? 11.5, cooldown: cfg.cooldown ?? 2.2 }),
   '~': (base, cfg) => ({ kind: 'discoFloor', ...base, duration: cfg.duration ?? 1.1 }),
   '+': (base) => ({ kind: 'syncPlate', ...base }),
+  '?': (base, cfg) => ({ kind: 'bluffDoor', ...base, swapOnDeath: cfg.swapOnDeath ?? true }),
+  '_': (base, cfg) => ({ kind: 'weightBridge', ...base, delay: cfg.delay ?? 0.15, respawn: cfg.respawn ?? 2.0 }),
+  ':': (base, cfg) => ({ kind: 'countdownLie', ...base, triggerDist: cfg.triggerDist ?? 5.5, stepTime: cfg.stepTime ?? 0.55 }),
+  '/': (base, cfg) => ({ kind: 'shyPlatform', ...base, shift: cfg.shift ?? 2, triggerDist: cfg.triggerDist ?? 5.0 }),
+  '(': (base, cfg) => ({ kind: 'hungryFloor', ...base, delay: cfg.delay ?? 0.4, spitUp: !!cfg.spitUp }),
+  '|': (base, cfg) => ({ kind: 'portalWall', ...base, toMarker: cfg.to ?? null }),
 };
 
 export function parseLevel({ name, world = 1, coopOnly = false, rows, traps = [], signs = [], taunts = [] }) {
@@ -83,6 +89,18 @@ export function parseLevel({ name, world = 1, coopOnly = false, rows, traps = []
   const cfg = (ch) => traps.find((t) => t.at === ch) ?? {};
   const trapDefs = cells.map(({ ch, cx, cy }) => TRAP_BUILDERS[ch]({ cx, cy, cell: cy * W + cx }, cfg(ch)));
   const doorCfg = cfg('D');
+  if (door && doorCfg.shrink) {
+    door.shrink = true;
+    door.shrinkRadius = doorCfg.radius ?? 3.0;
+    door.shrinkDuration = doorCfg.duration ?? 5.0;
+  }
+  for (const t of trapDefs) {
+    if (t.kind === 'portalWall' && t.toMarker) {
+      const target = markers[t.toMarker]?.[0];
+      if (!target) throw new Error(`level "${name}" portalWall missing target marker "${t.toMarker}"`);
+      t.to = target;
+    }
+  }
   const route = Array.isArray(doorCfg.runTo) ? doorCfg.runTo : (doorCfg.runTo ? [doorCfg.runTo] : []);
   const stops = route.map((m) => {
     const stop = markers[m]?.[0];

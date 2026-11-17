@@ -87,6 +87,18 @@ export function createCoopSession(handlers) {
   let pongTimer = 0;
   let attempt = 0;
   let connectedOnce = false;
+  let pc = null;
+  let dc = null;
+  let rtcStartedForCode = null;
+  let pingTimer = 0;
+  let latestPingMs = null;
+
+  const emitNetStats = () => {
+    handlers.onNetStats?.({
+      p2p: Boolean(dc && dc.readyState === 'open'),
+      pingMs: latestPingMs,
+    });
+  };
 
   const send = (msg) => {
     if (socket && socket.readyState === WebSocket.OPEN) {
@@ -94,17 +106,129 @@ export function createCoopSession(handlers) {
     }
   };
 
+  const sendFast = (msg) => {
+    if (dc && dc.readyState === 'open') {
+      try {
+        dc.send(JSON.stringify(msg));
+        return;
+      } catch { /* fallback to WebSocket */ }
+    }
+    send(msg);
+  };
+
+  const closeRtc = () => {
+    rtcStartedForCode = null;
+    if (dc) {
+      try { dc.close(); } catch { /* ignore */ }
+      dc = null;
+    }
+    if (pc) {
+      try { pc.close(); } catch { /* ignore */ }
+      pc = null;
+    }
+  };
+
+  const dispatchFastMessage = (raw) => {
+    let data;
+    try { data = JSON.parse(String(raw)); } catch { return; }
+    if (data.type === 'input') handlers.onGuestInput?.(data);
+    else if (data.type === 'state') handlers.onStateSync?.(data.state);
+    else if (data.type === 'guest_state') handlers.onGuestState?.(data.state);
+    else if (data.type === 'net_ping') sendFast({ type: 'net_pong', t: data.t });
+    else if (data.type === 'net_pong' && Number.isFinite(data.t)) {
+      latestPingMs = Math.max(1, Math.round(performance.now() - data.t));
+      emitNetStats();
+    }
+  };
+
+  const attachDataChannel = (channel) => {
+    dc = channel;
+    channel.addEventListener('open', () => {
+      if (dc !== channel) return;
+      emitNetStats();
+      sendFast({ type: 'net_ping', t: performance.now() });
+    });
+    channel.addEventListener('message', (ev) => {
+      if (dc !== channel) return;
+      dispatchFastMessage(ev.data);
+    });
+    channel.addEventListener('close', () => {
+      if (dc === channel) {
+        dc = null;
+        emitNetStats();
+      }
+    });
+  };
+
+  const initRtc = async (isHost) => {
+    if (typeof RTCPeerConnection !== 'function') return;
+    closeRtc();
+    try {
+      const peer = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+        ],
+      });
+      pc = peer;
+      peer.addEventListener('icecandidate', (ev) => {
+        if (pc === peer && ev.candidate) {
+          send({ type: 'rtc_signal', signal: { candidate: ev.candidate } });
+        }
+      });
+      peer.addEventListener('datachannel', (ev) => {
+        if (pc === peer) attachDataChannel(ev.channel);
+      });
+      if (isHost) {
+        const channel = peer.createDataChannel('coop-fast', { ordered: false, maxRetransmits: 0 });
+        attachDataChannel(channel);
+        const offer = await peer.createOffer();
+        if (pc !== peer) return;
+        await peer.setLocalDescription(offer);
+        send({ type: 'rtc_signal', signal: { sdp: peer.localDescription } });
+      }
+    } catch {
+      closeRtc();
+    }
+  };
+
+  const handleRtcSignal = async (signal) => {
+    if (typeof RTCPeerConnection !== 'function' || !signal) return;
+    try {
+      if (signal.sdp) {
+        if (!pc && signal.sdp.type === 'offer') {
+          await initRtc(false);
+        }
+        if (!pc) return;
+        await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+        if (signal.sdp.type === 'offer') {
+          const answer = await pc.createAnswer();
+          if (!pc) return;
+          await pc.setLocalDescription(answer);
+          send({ type: 'rtc_signal', signal: { sdp: pc.localDescription } });
+        }
+      } else if (signal.candidate && pc) {
+        await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+      }
+    } catch {
+      // Ignore transient ICE/SDP errors; WebSocket fallback remains active.
+    }
+  };
+
   const clearTimers = () => {
     clearTimeout(reconnectTimer);
     clearInterval(heartbeatTimer);
+    clearInterval(pingTimer);
     clearTimeout(pongTimer);
     reconnectTimer = 0;
     heartbeatTimer = 0;
+    pingTimer = 0;
     pongTimer = 0;
   };
 
   const closeSocket = (sendLeave) => {
     clearTimers();
+    closeRtc();
     if (!socket) return;
     const old = socket;
     socket = null;
@@ -156,6 +280,10 @@ export function createCoopSession(handlers) {
           if (socket === ws && !intentionalClose) open(activeParams);
         }, PONG_TIMEOUT_MS);
       }, HEARTBEAT_MS);
+      pingTimer = setInterval(() => {
+        if (socket !== ws || ws.readyState !== WebSocket.OPEN) return;
+        sendFast({ type: 'net_ping', t: performance.now() });
+      }, 2000);
     });
 
     ws.addEventListener('message', (ev) => {
@@ -172,14 +300,36 @@ export function createCoopSession(handlers) {
             activeParams.levelIndex = data.snapshot.levelIndex;
           }
           handlers.onSnapshot?.(data.snapshot);
+          if (
+            data.snapshot.isHost &&
+            data.snapshot.seats?.every((s) => s.occupant === 'human' && s.connected) &&
+            rtcStartedForCode !== data.snapshot.code &&
+            (!dc || dc.readyState !== 'open')
+          ) {
+            rtcStartedForCode = data.snapshot.code;
+            initRtc(true);
+          }
           break;
         case 'started': handlers.onStarted?.(data.levelIndex); break;
         case 'input': handlers.onGuestInput?.(data); break;
         case 'state': handlers.onStateSync?.(data.state); break;
+        case 'guest_state': handlers.onGuestState?.(data.state); break;
+        case 'rtc_signal': handleRtcSignal(data.signal); break;
+        case 'net_ping': sendFast({ type: 'net_pong', t: data.t }); break;
+        case 'net_pong':
+          if (Number.isFinite(data.t)) {
+            latestPingMs = Math.max(1, Math.round(performance.now() - data.t));
+            emitNetStats();
+          }
+          break;
         case 'event': handlers.onEventSync?.(data.event); break;
         case 'restart': handlers.onRestart?.(data.by); break;
         case 'emote': handlers.onEmote?.(data.fromSeat, data.emote); break;
-        case 'peer_left': handlers.onPeerLeft?.(data.seat); break;
+        case 'chat': handlers.onChat?.(data); break;
+        case 'peer_left':
+          closeRtc();
+          handlers.onPeerLeft?.(data.seat);
+          break;
         case 'room_closed':
           intentionalClose = true;
           activeParams = null;
@@ -226,10 +376,11 @@ export function createCoopSession(handlers) {
       clearRoomFromBrowserUrl();
     },
     isConnected: () => Boolean(socket && socket.readyState === WebSocket.OPEN),
+    isP2P: () => Boolean(dc && dc.readyState === 'open'),
     setName: (name) => send({ type: 'set_name', name }),
     setLevel: (levelIndex) => send({ type: 'set_level', levelIndex }),
     startMatch: (levelIndex) => send({ type: 'start', levelIndex }),
-    sendInput: (inp, seq = 0) => send({
+    sendInput: (inp, seq = 0) => sendFast({
       type: 'input',
       seq,
       left: !!inp.left,
@@ -238,9 +389,11 @@ export function createCoopSession(handlers) {
       down: !!inp.down,
       jump: !!inp.jump,
     }),
-    sendState: (state) => send({ type: 'state', state }),
+    sendGuestState: (state) => sendFast({ type: 'guest_state', state }),
+    sendState: (state) => sendFast({ type: 'state', state }),
     sendEvent: (event) => send({ type: 'event', event }),
     sendRestart: () => send({ type: 'restart' }),
     sendEmote: (emote) => send({ type: 'emote', emote }),
+    sendChat: (text) => send({ type: 'chat', text }),
   };
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { LEVELS } from '../levels.js';
 import { parseLevel } from './level.js';
-import { createGame, step, exportCoopSnapshot, applyCoopSnapshot } from './game.js';
+import { createGame, step, stepPlayerLocal, exportCoopSnapshot, applyCoopSnapshot } from './game.js';
 
 const NONE = { left: false, right: false, down: false, jump: false };
 const RIGHT = { left: false, right: true, down: false, jump: false };
@@ -245,37 +245,37 @@ describe('analog moveX + co-op coordination traps', () => {
     expect(guest.players[0].prevX).toBeCloseTo(host.players[0].x, 4);
   });
 
-  it('solo stops at L35 (never enters coopOnly L36-L42), while co-op advances from L35 straight into L36-L42 together', () => {
+  it('solo stops at last solo level (never enters coopOnly), while co-op advances straight into World 5 together', () => {
     // 1. Standalone 2P level lock check in LEVELS metadata
-    expect(LEVELS.slice(0, 35).every((l) => !l.coopOnly)).toBe(true);
-    expect(LEVELS.slice(35).every((l) => l.coopOnly)).toBe(true);
+    expect(LEVELS.slice(0, 47).every((l) => !l.coopOnly)).toBe(true);
+    expect(LEVELS.slice(47).every((l) => l.coopOnly)).toBe(true);
 
-    // 2. Solo win at L35 (index 34) finishes Solo campaign cleanly instead of entering L36
-    const soloGame = createGame(LEVELS, 34, { coop: false });
+    // 2. Solo win at index 46 finishes Solo campaign cleanly instead of entering coopOnly
+    const soloGame = createGame(LEVELS, 46, { coop: false });
     const l35 = soloGame.level;
-    expect(soloGame.levelIndex).toBe(34);
+    expect(soloGame.levelIndex).toBe(46);
     soloGame.players[0].x = l35.door.x;
     soloGame.players[0].y = l35.door.y;
     const soloWin = step(soloGame, NONE, DT);
-    expect(soloWin.some((e) => e.type === 'win' && e.level === 34)).toBe(true);
+    expect(soloWin.some((e) => e.type === 'win' && e.level === 46)).toBe(true);
     expect(soloGame.finished).toBe(true);
-    expect(soloGame.levelIndex).toBe(34);
+    expect(soloGame.levelIndex).toBe(46);
 
     // 3. Co-op starting at L1 advances cleanly to L2 only when BOTH reach the door,
-    // and Co-op at L35 advances into World 5 L36..L42 when BOTH reach door together
-    const coopL35 = createGame(LEVELS, 34, { coop: true });
+    // and Co-op at index 46 advances into World 5 index 47 when BOTH reach door together
+    const coopL35 = createGame(LEVELS, 46, { coop: true });
     coopL35.players[0].x = l35.door.x;
     coopL35.players[0].y = l35.door.y;
     step(coopL35, [NONE, NONE], DT);
     expect(coopL35.players[0].atDoor).toBe(true);
-    expect(coopL35.levelIndex).toBe(34); // P2 not at door yet -> cannot clear L35 alone!
+    expect(coopL35.levelIndex).toBe(46); // P2 not at door yet -> cannot clear alone!
 
     coopL35.players[1].x = l35.door.x;
     coopL35.players[1].y = l35.door.y;
     const coopWin = step(coopL35, [NONE, NONE], DT);
-    expect(coopWin.some((e) => e.type === 'win' && e.level === 34)).toBe(true);
+    expect(coopWin.some((e) => e.type === 'win' && e.level === 46)).toBe(true);
     expect(coopL35.finished).toBe(false);
-    expect(coopL35.levelIndex).toBe(35); // Advances straight into L36 together!
+    expect(coopL35.levelIndex).toBe(47); // Advances straight into World 5 together!
   });
 
   it('syncPlate (+) requires BOTH partners to step on twin plates within sync window to open gates', () => {
@@ -315,5 +315,29 @@ describe('analog moveX + co-op coordination traps', () => {
     runCoop(g, NONE, NONE, 20);
     expect(g.channelB).toBe(true);
     expect(g.players[0].x).toBeGreaterThan(xBefore + 0.08);
+  });
+
+  it('stepPlayerLocal predicts Guest (P2) movement immediately and reconciles smoothly with Host snapshots', () => {
+    const level = lvl({
+      rows: [
+        '................',
+        'P.............D.',
+        '################',
+      ],
+    });
+    const host = createGame([level], 0, { coop: true });
+    const guest = createGame([level], 0, { coop: true });
+
+    // Guest predicts 10 frames of moving right & jumping locally before Host snapshot arrives
+    for (let i = 0; i < 10; i++) stepPlayerLocal(guest, 1, JUMP_R, DT);
+    expect(guest.players[1].x).toBeGreaterThan(0.8);
+    expect(guest.players[1].y).toBeGreaterThan(1.0);
+
+    // Host receives the same input slightly delayed (8 frames) and sends snapshot
+    runCoop(host, NONE, JUMP_R, 8);
+    applyCoopSnapshot(guest, exportCoopSnapshot(host), { predictPlayerIndex: 1 });
+    // Guest smoothly blends toward Host without snapping backwards abruptly
+    expect(guest.players[1].x).toBeGreaterThan(host.players[1].x);
+    expect(guest.players[1].x).toBeLessThan(1.5);
   });
 });

@@ -558,4 +558,95 @@ describe('new unexpected funny traps (!, %, $, ~)', () => {
     expect(g.player.danceTimer).toBeGreaterThan(0);
     expect(g.player.trapAnim).toBe('disco');
   });
+
+  it('bluffDoor (?) teleports player back to start on even attempts and swaps after a death', () => {
+    const g = createGame([lvl([
+      '.............',
+      'P..?.......D.',
+      '#############',
+    ])]);
+    const ev = run(g, RIGHT, 28);
+    expect(ev.some((e) => e.type === 'doorBluff')).toBe(true);
+    expect(g.player.x).toBeLessThan(2);
+    expect(g.finished).toBe(false);
+  });
+
+  it('shrinkDoor shrinks on approach until plateA (H) is pressed', () => {
+    const g = createGame([parseLevel({
+      name: 'shrink',
+      rows: [
+        '.............',
+        'P.H........D.',
+        '#############',
+      ],
+      traps: [{ at: 'D', shrink: true, radius: 3.0, duration: 5.0 }],
+    })]);
+    // Walk right past H -> unshrunkTimer keeps door open
+    const ev = run(g, RIGHT, 120);
+    expect(ev.some((e) => e.type === 'win')).toBe(true);
+  });
+
+  it('weightBridge (_) holds 1 player, collapses when 2 stand on it', () => {
+    const g = createGame([lvl([
+      '.............',
+      'P............',
+      '##____#######',
+    ])], 0, { coop: true });
+    // P0 stands on bridge alone -> holds
+    for (let i = 0; i < 40; i++) step(g, [RIGHT, NONE], 1 / 60);
+    expect(g.traps[0].state).toBe('idle');
+    // P1 also walks onto bridge -> collapses
+    for (let i = 0; i < 50; i++) step(g, [NONE, RIGHT], 1 / 60);
+    expect(g.traps.some((t) => t.state === 'fallen' || t.state === 'shaking')).toBe(true);
+  });
+
+  it('countdownLie (:) emits countdown events when player approaches', () => {
+    const g = createGame([lvl([
+      '......:......',
+      'P..........D.',
+      '#############',
+    ])]);
+    const ev = run(g, RIGHT, 90);
+    expect(ev.some((e) => e.type === 'countdown' && e.text === '3...')).toBe(true);
+  });
+
+  it('shyPlatform (/) shifts right when player jumps near it', () => {
+    const g = createGame([lvl([
+      '.............',
+      'P..........D.',
+      '##..//..#####',
+    ])]);
+    run(g, RIGHT, 8);
+    const ev = run(g, { left: false, right: true, jump: true }, 12);
+    expect(ev.some((e) => e.type === 'trap' && e.kind === 'shyPlatform')).toBe(true);
+  });
+
+  it('hungryFloor (() swallows player back to start after standing > 0.4s', () => {
+    const g = createGame([lvl([
+      '.............',
+      'P..........D.',
+      '##((#########',
+    ])]);
+    run(g, RIGHT, 14); // step onto hungryFloor
+    const ev = run(g, NONE, 36); // stand still > 0.4s
+    expect(ev.some((e) => e.type === 'trap' && e.kind === 'hungryFloor')).toBe(true);
+    expect(g.player.x).toBeLessThan(2);
+  });
+
+  it('portalWall (|) teleports player to target marker', () => {
+    const g = createGame([parseLevel({
+      name: 'portal',
+      rows: [
+        '.T.......D...',
+        '.#########...',
+        '.............',
+        'P...........|',
+        '#############',
+      ],
+      traps: [{ at: '|', to: 'T' }],
+    })]);
+    const ev = run(g, RIGHT, 130);
+    expect(ev.some((e) => e.type === 'trap' && e.kind === 'portalWall')).toBe(true);
+    expect(g.player.y).toBeGreaterThan(2);
+  });
 });

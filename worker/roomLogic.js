@@ -4,7 +4,7 @@
  */
 export const ROOM_IDLE_TTL_MS = 60_000;
 export const DISCONNECT_CLOSE_GRACE_MS = 30_000;
-const MAX_LEVEL_INDEX = 41;
+const MAX_LEVEL_INDEX = 61;
 
 function sanitizeName(raw) {
   if (typeof raw !== 'string') return undefined;
@@ -151,6 +151,11 @@ export function snapshotForPlayer(record, playerId) {
   };
 }
 
+function sanitizeChatText(raw) {
+  const clean = String(raw ?? '').replace(/\s+/g, ' ').trim();
+  return clean ? clean.slice(0, 120) : '';
+}
+
 export function handleRoomAction(record, playerId, msg, now = Date.now()) {
   const seatIndex = record.seats.findIndex((s) => s.playerId === playerId);
   const noop = { record, persist: false, broadcastSnapshots: false, relayToOthers: [], broadcast: [] };
@@ -221,6 +226,37 @@ export function handleRoomAction(record, playerId, msg, now = Date.now()) {
         broadcast: [],
       };
     }
+    case 'guest_state': {
+      // Guest (seat 1) streams its authoritative local position when using WebSocket fallback.
+      if (seatIndex !== 1 || !record.started || !msg.state) return noop;
+      return {
+        record,
+        persist: false,
+        broadcastSnapshots: false,
+        relayToOthers: [{ type: 'guest_state', state: msg.state }],
+        broadcast: [],
+      };
+    }
+    case 'rtc_signal': {
+      if (!msg.signal) return noop;
+      return {
+        record,
+        persist: false,
+        broadcastSnapshots: false,
+        relayToOthers: [{ type: 'rtc_signal', signal: msg.signal }],
+        broadcast: [],
+      };
+    }
+    case 'net_ping':
+    case 'net_pong': {
+      return {
+        record,
+        persist: false,
+        broadcastSnapshots: false,
+        relayToOthers: [{ type: msg.type, t: Number(msg.t) || 0 }],
+        broadcast: [],
+      };
+    }
     case 'event': {
       // Only Host (seat 0) broadcasts canonical simulation events (death, win, trap, doorWait, respawn).
       if (seatIndex !== 0 || !record.started || !msg.event) return noop;
@@ -255,6 +291,19 @@ export function handleRoomAction(record, playerId, msg, now = Date.now()) {
         persist: false,
         broadcastSnapshots: false,
         relayToOthers: [{ type: 'emote', fromSeat: seatIndex, emote: code }],
+        broadcast: [],
+      };
+    }
+    case 'chat': {
+      const text = sanitizeChatText(msg.text);
+      if (!text) return noop;
+      const seat = record.seats[seatIndex];
+      const senderName = seat?.playerName ?? (seatIndex === 0 ? 'Momo' : 'Mimi');
+      return {
+        record: { ...record, lastActiveAt: now },
+        persist: false,
+        broadcastSnapshots: false,
+        relayToOthers: [{ type: 'chat', fromSeat: seatIndex, senderName, text, at: now }],
         broadcast: [],
       };
     }

@@ -124,5 +124,6 @@ export const sfx = {
   pie: () => { noiseBurst(0.16, 0.15); tone('sine', 340, 140, 0.14, 0.11); },
   disco: () => [523, 659, 784, 988, 1046].forEach((f, i) => tone('square', f, f * 1.03, 0.07, 0.055, i * 0.06)),
   win: () => [523, 659, 784, 1046].forEach((f, i) => tone('square', f, f, 0.12, 0.07, i * 0.09)),
+  chat: () => { tone('sine', 660, 880, 0.08, 0.09); tone('sine', 880, 1100, 0.09, 0.08, 0.06); },
   babble: () => { for (let i = 0; i < 6; i++) { const f = 500 + Math.random() * 500; tone('square', f, f * 0.9, 0.05, 0.035, i * 0.06); } },
 };

@@ -1,0 +1,5 @@
+/
+  Content-Security-Policy: frame-ancestors 'self' https://inkfinitystudio.store https://www.inkfinitystudio.store http://localhost:* http://127.0.0.1:*
+
+/index.html
+  Content-Security-Policy: frame-ancestors 'self' https://inkfinitystudio.store https://www.inkfinitystudio.store http://localhost:* http://127.0.0.1:*
