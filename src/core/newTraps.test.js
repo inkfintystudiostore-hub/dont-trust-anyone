@@ -24,11 +24,13 @@ function fair(level) {
 
 const icicle = parseLevel({
   name: 'icicle',
-  rows: [
+  rows: [ // same ceiling height as the icicleHall room
     '##########################',
     '..........;...............',
     '..........................',
+    '..........................',
     '.P...................D....',
+    '##########################',
     '##########################',
   ],
 });
@@ -133,5 +135,66 @@ describe('Level Devil trap set', () => {
     step(g, {}, DT);
     expect(g.player.size).toBe(1);
     expect(g.player.height).toBeCloseTo(0.86);
+  });
+});
+
+// User rule (17 Nov): a player who is paying attention must have a moment to escape spike traps.
+// Measured with real physics: time from "the trap shows itself" to the last frame a jump/stop still saves you.
+import { LEVELS } from '../levels.js';
+
+const MIN_REACT_MS = 240;
+function reactWindowMs(level, isShown, escape) {
+  const g = createGame([level]);
+  let shownAt = -1;
+  for (let f = 0; f < 300 && shownAt < 0; f++) { step(g, { right: true }, DT); if (isShown(g)) shownAt = f; }
+  const survives = (at) => {
+    const s = createGame([level]);
+    for (let f = 0; f < 300; f++) {
+      const inp = f < at ? { right: true } : escape(f, at);
+      if (step(s, inp, DT).some((e) => e.type === 'death')) return false;
+      if (s.player.x > level.W - 4) return true;
+    }
+    return true;
+  };
+  let last = -1;
+  for (let f = Math.max(0, shownAt - 10); f < shownAt + 60; f++) if (survives(f)) last = f;
+  return { shownAt, ms: Math.round(((last - shownAt) * 1000) / 60) };
+}
+const corridor = (row) => ['..............................', '..............................', '..............................', row, '##############################'];
+const uniq = (kind, keys) => [...new Map(LEVELS.flatMap((l) => l.trapDefs.filter((t) => t.kind === kind))
+  .map((t) => [keys.map((k) => t[k]).join('/'), t])).values()];
+
+describe('spike traps leave a moment to react', () => {
+  it.each(uniq('hiddenSpikes', ['delay', 'radius']).map((t) => [t.delay, t.radius]))('hidden spikes (delay %s, radius %s): jump window >= 240 ms, runner still dies', (delay, radius) => {
+    const level = parseLevel({ name: 'react', rows: corridor('P.............S.........D.....'), traps: [{ at: 'S', delay, radius }] });
+    const r = reactWindowMs(level, (g) => g.traps[0].active, (f, at) => ({ right: true, jump: f === at }));
+    expect(r.ms).toBeGreaterThanOrEqual(MIN_REACT_MS);
+    expect(runRight(level).died).toBe('spikes');
+  });
+
+  it.each(uniq('icicle', ['delay', 'radius']).map((t) => [t.delay, t.radius]))('icicle (delay %s, radius %s): stop/jump window >= 240 ms, runner still dies', (delay, radius) => {
+    const rows = ['##############################', '...............;..............', '..............................', '..............................', 'P.......................D.....', '##############################', '##############################'];
+    const level = parseLevel({ name: 'react', rows, traps: [{ at: ';', delay, radius }] });
+    const stop = reactWindowMs(level, (g) => g.traps[0].state === 'falling', () => ({ left: true }));
+    const jump = reactWindowMs(level, (g) => g.traps[0].state === 'falling', (f, at) => ({ right: true, jump: f === at }));
+    expect(Math.max(stop.ms, jump.ms)).toBeGreaterThanOrEqual(MIN_REACT_MS);
+    expect(runRight(level).died).toBe('icicle');
+  });
+
+  it('spike-swap pops on the 3rd approach early enough to jump it', () => {
+    // the door runs you back and forth over the tile: pass 3 is the dangerous one
+    const level = parseLevel({ name: 'react', rows: corridor('P1...........,..........D2...'), traps: [{ at: 'D', runTo: ['1', '2'], radius: 1.6 }] });
+    const g = createGame([level]);
+    const t = g.traps.find((x) => x.kind === 'spikeSwap');
+    let poppedAtDist = null;
+    let dir = 1;
+    for (let f = 0; f < 60 * 15 && poppedAtDist === null; f++) {
+      if (g.door.stopIndex === 1) dir = -1;
+      if (g.door.stopIndex === 2) dir = 1;
+      step(g, { right: dir > 0, left: dir < 0 }, DT);
+      if (t.active) poppedAtDist = Math.abs(g.player.x - (t.cx + 0.5));
+    }
+    expect(t.step).toBeGreaterThanOrEqual(3);
+    expect(poppedAtDist).toBeGreaterThan(2.6); // ~250 ms of running before you reach it
   });
 });

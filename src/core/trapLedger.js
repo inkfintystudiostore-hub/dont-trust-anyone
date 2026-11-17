@@ -10,13 +10,12 @@ export const IGNORED_KINDS = new Set(['runningDoor']); // door behaviour, not a 
 
 // Parameter direction that makes a trap harder: -1 = smaller is harder, +1 = bigger is harder.
 export const HARDER = {
-  hiddenSpikes: { delay: -1, radius: 1 },
+  hiddenSpikes: { delay: -1 },
   crusher: { delay: -1, slamSpeed: 1 },
   boulder: { speed: 1 },
   pieCannon: { speed: 1, cooldown: -1 },
   conveyor: { speed: 1 },
   saw: { speed: 1 },
-  icicle: { delay: -1 },
   risingFloor: { speed: 1, delay: -1 },
   closingWall: { delay: -1 },
   sizeSwell: { duration: 1 },

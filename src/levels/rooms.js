@@ -16,7 +16,7 @@ const R = (rows, traps = [], extra = {}, groups = [], o = {}) => {
   return { rows: grid.map((r) => r.join('')), traps: [...used.flatMap((gr) => gr.traps ?? []), ...traps], maxMore: groups.length, ...extra };
 };
 // extra building blocks, all from traps that debut early (pits L1, hidden spikes L2, coins L3)
-const xS = (x, o) => ({ cells: [[x, 'w', 'S']], traps: [{ at: 'S', x, delay: L(0.12, 0.08, o), radius: L(1.6, 1.9, o) }] });
+const xS = (x, o) => ({ cells: [[x, 'w', 'S']], traps: [{ at: 'S', x, delay: L(0.12, 0.08, o), radius: 3.6 }] });
 const xC = (x, r = 'w') => ({ cells: [[x, r, 'C']] });
 const xPit = (x, o) => ({
   cells: [[x, 'f', 'F'], [x + 1, 'f', 'F'], [x, 'b', '.'], [x + 1, 'b', '.']],
@@ -66,7 +66,7 @@ export const ROOMS = {
     's.........S.......S...e.',
     '########################',
     '########################',
-  ], [{ at: 'S', delay: L(0.12, 0.08, o), radius: L(1.6, 1.9, o) }], {}, [xS(5, o), xS(14, o)], o),
+  ], [{ at: 'S', delay: L(0.12, 0.08, o), radius: 3.6 }], {}, [xS(5, o), xS(14, o)], o),
 
   // --- invisibleBlock (bonks a normal jump into the gap) ---
   invisGap: (o = {}) => R([
@@ -92,7 +92,7 @@ export const ROOMS = {
     's.......................S..e..',
     '######GGGGGG##################',
     '######......##################',
-  ], [{ at: 'S', delay: L(0.12, 0.08, o), radius: 1.6 }], {}, [xS(20, o), xC(16, 2)], o),
+  ], [{ at: 'S', delay: L(0.12, 0.08, o), radius: 3.6 }], {}, [xS(20, o), xC(16, 2)], o),
 
   // --- chompCoin: the dot row from the trailer bites ---
   coinRow: (o = {}) => R([
@@ -125,7 +125,7 @@ export const ROOMS = {
     's.....................e...',
     '##########################',
     '##########################',
-  ], [{ at: ';', delay: L(0.05, 0.03, o) }], {}, [cell(17, 2, ';'), cell(11, 2, ';')], o),
+  ], [], {}, [cell(17, 2, ';'), cell(11, 2, ';')], o),
 
   // --- fakeDoor: celebrating drops the floor ---
   fakeExit: (o = {}) => R([
@@ -244,7 +244,7 @@ export const ROOMS = {
     's........######.......#####e..',
     '######..................&.####',
     '##############################',
-  ], [{ at: '&', dir: -1, range: 12, speed: L(5, 6.5, o) }], {}, [xS(3, o), xC(11, 3)], o),
+  ], [{ at: '&', dir: -1, range: 12, speed: L(5, 6.5, o) }], {}, [xS(3, o), xC(6)], o),
 
   // --- springTrap ---
   springCeiling: (o = {}) => R([
@@ -327,7 +327,7 @@ export const ROOMS = {
     's...?....R..........S.........e...',
     '#########GGG######################',
     '#########...######################',
-  ], [{ at: '?', swapOnDeath: true }, { at: 'S', delay: 0.12, radius: 1.6 }], { final: true }, [xS(25, o), xC(2)], o),
+  ], [{ at: '?', swapOnDeath: true }, { at: 'S', delay: 0.12, radius: 3.6 }], { final: true }, [xS(25, o), xC(2)], o),
 
   // --- sizeSwell: grow giant, the low spike ceiling ahead no longer fits ---
   swellHall: (o = {}) => R([
@@ -374,7 +374,7 @@ export const ROOMS = {
     's.........B......................|',
     '##################################',
     '##################################',
-  ], [{ at: '|', to: 'T' }, { at: 'S', delay: 0.12, radius: 1.6 }], { final: true }, [xS(5, o), xC(20)], o),
+  ], [{ at: '|', to: 'T' }, { at: 'S', delay: 0.12, radius: 3.6 }], { final: true }, [xS(5, o), xC(20)], o),
 
   // --- shyPlatform ---
   shySteps: (o = {}) => R([
@@ -430,5 +430,5 @@ export const ROOMS = {
     's.....N....^^.....S......e...',
     '#############################',
     '#############################',
-  ], [{ at: 'S', delay: 0.09, radius: 1.6 }], {}, [xS(22, o), xC(15)], o),
+  ], [{ at: 'S', delay: 0.09, radius: 3.6 }], {}, [xS(22, o), xC(15)], o),
 };

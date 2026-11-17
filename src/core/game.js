@@ -1473,7 +1473,9 @@ function updateDevilTrap(g, t, i, dt, auth, only = -1) {
             if (only >= 0 && pi !== only) continue;
           const p = players[pi];
           const bit = 1 << pi;
-          const inZone = !p.atDoor && overlaps(p, t.cx + 0.12, t.cy, t.cx + 0.88, t.cy + 0.5);
+          // counts approaches, not steps: the 3rd time you come near, the spikes pop while you are still
+          // far enough away to react and jump (same reaction distance as hidden spikes)
+          const inZone = !p.atDoor && Math.abs(p.x - (t.cx + 0.5)) < t.radius && Math.abs(p.y - t.cy) < 2;
           if (inZone && !(t.insideMask & bit)) {
             t.step++;
             if (t.step > t.after && !t.active) {

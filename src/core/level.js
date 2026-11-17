@@ -19,6 +19,8 @@
  * level.W === 4; level.H === 2; level.start // { x: 0.5, y: 1 }
  */
 export const TILE = { EMPTY: 0, SOLID: 1, SPIKES: 2 };
+/** How far ahead pop-up spikes trigger, so a full-speed runner still has ~250 ms to jump. */
+export const SPIKE_REACT_RADIUS = 3.6;
 
 const TRAP_BUILDERS = {
   F: (base, cfg) => ({ kind: 'fallingFloor', ...base, delay: cfg.delay ?? 0.25, near: cfg.near ?? 0 }),
@@ -28,7 +30,8 @@ const TRAP_BUILDERS = {
   R: (base, cfg) => ({ kind: 'rubberChicken', ...base, boost: cfg.boost ?? 1.42 }),
   C: (base) => ({ kind: 'chompCoin', ...base }),
   X: (base, cfg) => ({ kind: 'fakeDoor', ...base, radius: cfg.radius ?? 3.5 }),
-  S: (base, cfg) => ({ kind: 'hiddenSpikes', ...base, delay: cfg.delay ?? 0.15, radius: cfg.radius ?? 1.5 }),
+  // Spike traps pop early enough for a running player to react (~250-300 ms): see newTraps.test.js.
+  S: (base, cfg) => ({ kind: 'hiddenSpikes', ...base, delay: cfg.delay ?? 0.12, radius: cfg.radius ?? SPIKE_REACT_RADIUS }),
   '>': (base, cfg) => ({ kind: 'conveyor', ...base, dir: 1, speed: cfg.speed ?? 3.2 }),
   '<': (base, cfg) => ({ kind: 'conveyor', ...base, dir: -1, speed: cfg.speed ?? 3.2 }),
   M: (base, cfg) => ({ kind: 'crusher', ...base, delay: cfg.delay ?? 0.16, slamSpeed: cfg.slamSpeed ?? 24, riseSpeed: cfg.riseSpeed ?? 4, rest: cfg.rest ?? 0.45 }),
@@ -63,12 +66,12 @@ const TRAP_BUILDERS = {
   '(': (base, cfg) => ({ kind: 'hungryFloor', ...base, delay: cfg.delay ?? 0.4, spitUp: !!cfg.spitUp }),
   '|': (base, cfg) => ({ kind: 'portalWall', ...base, toMarker: cfg.to ?? null }),
   // Level Devil set (2026-11-17). Symbols, not letters, so marker letters stay free.
-  ';': (base, cfg) => ({ kind: 'icicle', ...base, delay: cfg.delay ?? 0.05, radius: cfg.radius ?? 2.2 }),
+  ';': (base, cfg) => ({ kind: 'icicle', ...base, delay: cfg.delay ?? 0.05, radius: cfg.radius ?? 3.0 }),
   ']': (base, cfg) => ({ kind: 'closingWall', ...base, dx: cfg.dx ?? 1.2, delay: cfg.delay ?? 0.06 }),
   '[': (base, cfg) => ({ kind: 'risingFloor', ...base, rise: cfg.rise ?? 3, speed: cfg.speed ?? 6, delay: cfg.delay ?? 0.1 }),
   '&': (base, cfg) => ({ kind: 'saw', ...base, dir: cfg.dir ?? 1, speed: cfg.speed ?? 3.5, range: cfg.range ?? 4, axis: cfg.axis ?? 'x', popup: cfg.popup ?? 0 }),
   '{': (base, cfg) => ({ kind: 'sizeSwell', ...base, scale: cfg.scale ?? 2, duration: cfg.duration ?? 3.5 }),
-  ',': (base, cfg) => ({ kind: 'spikeSwap', ...base, after: cfg.after ?? 2 }),
+  ',': (base, cfg) => ({ kind: 'spikeSwap', ...base, after: cfg.after ?? 2, radius: cfg.radius ?? SPIKE_REACT_RADIUS }),
 };
 
 export function parseLevel({ name, world = 1, coopOnly = false, breather = false, rows, traps = [], signs = [], taunts = [] }) {
