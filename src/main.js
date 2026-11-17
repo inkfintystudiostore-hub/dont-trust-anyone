@@ -188,6 +188,7 @@ let hostSimTick = 0;
 let hostAckSeq = 0;
 let stateSyncTick = 0;
 let pendingLocalJump = false;
+const localIn = { left: false, right: false, moveX: 0, down: false, jump: false, restart: false }; // reused per tick
 const snapBuffer = createSnapshotBuffer({ fixedDt: FIXED });
 const guestReconciler = createGuestReconciler();
 
@@ -1032,9 +1033,10 @@ function frame(now) {
   prevRestart = input.restart;
 
   if (!transitioning) {
+    // input.jump's tap latch lasts one frame; keep it until a sim tick consumes it (>60 Hz frames often run none)
+    if (playing && input.jump) pendingLocalJump = true;
     if (coopRole === 'guest') {
       if (hitStop > 0) hitStop = Math.max(0, hitStop - dt);
-      if (playing && input.jump) pendingLocalJump = true;
       const activeIn = playing ? { ...input, jump: input.jump || pendingLocalJump } : IDLE;
       const qx = Math.round((activeIn.moveX || 0) * 20) / 20;
       const sig = `${+activeIn.left}${+activeIn.right}${qx}${+activeIn.down}${+activeIn.jump}`;
@@ -1102,9 +1104,12 @@ function frame(now) {
       let snapDue = false; // one snapshot per rendered frame, even after a catch-up burst of sim steps
       while (acc >= FIXED && !transitioning && !game.finished) {
         acc -= FIXED;
+        Object.assign(localIn, input);
+        localIn.jump = input.jump || pendingLocalJump;
+        pendingLocalJump = false;
         const stepIn = coopRole === 'host'
-          ? (playing ? [input, { ...guestInput, jump: guestInput.jump || guestJumpPending }] : [IDLE, IDLE])
-          : (playing ? input : IDLE);
+          ? (playing ? [localIn, { ...guestInput, jump: guestInput.jump || guestJumpPending }] : [IDLE, IDLE])
+          : (playing ? localIn : IDLE);
         if (coopRole === 'host' && guestJumpPending && game.players[1]) {
           game.players[1].prevJump = false;
         }

@@ -199,7 +199,6 @@ function advancePlayer(g, pi, inp, dt, emitEvents) {
   if (p.sizeTimer > 0 && (p.sizeTimer -= dt) <= 0) { p.size = 1; p.halfW = PHYS.halfW; p.height = PHYS.height; }
   p.trapAnimTimer = Math.max(0, p.trapAnimTimer - dt);
   if (p.trapAnimTimer <= 0) p.trapAnim = null;
-  if (p.pieTimer > 0) p.speedMul *= 0.65;
   if (p.danceTimer > 0 && p.onGround && !stunned) {
     if (Math.floor(g.time * 8) !== Math.floor((g.time - dt) * 8)) {
       p.vy = 4.6 * p.gravDir;
@@ -214,7 +213,11 @@ function advancePlayer(g, pi, inp, dt, emitEvents) {
   if (Math.abs(want) > 0.05 && !stunned && !slipping) p.face = want > 0 ? 1 : -1;
   const dir = stunned ? p.vx / PHYS.move : (slipping ? p.slipDir * (p.slipSpeed / PHYS.move) : want);
   if (stunned) { p.speedMul = 1; p.beltVx = 0; }
+  // pie slow applies to this move only: the guest never resets speedMul per tick, so *= would compound
+  const baseMul = p.speedMul;
+  if (p.pieTimer > 0 && !stunned) p.speedMul = baseMul * 0.65;
   movePlayer(p, dir, jumpPressed && !stunned && !slipping, dt, g.isSolid, p.hit);
+  p.speedMul = baseMul;
   if (inp.down && !p.onGround && !stunned) {
     p.vy = Math.max(-PHYS.maxFall, Math.min(PHYS.maxFall, p.vy - PHYS.gravity * 0.65 * dt * p.gravDir));
   }
@@ -353,8 +356,8 @@ export function step(g, inputOrInputs, dt) {
       for (let pi = 0; pi < g.players.length; pi++) {
         const p = g.players[pi];
         if (!p.atDoor && overlaps(p, fakeDoorPos.x - 0.35, fakeDoorPos.y, fakeDoorPos.x + 0.35, fakeDoorPos.y + 1.2)) {
-          p.x = g.level.start.x;
-          p.y = g.level.start.y;
+          p.x = p.prevX = g.level.start.x; // prev too, or the render lerp streaks across the level
+          p.y = p.prevY = g.level.start.y;
           p.vx = 0;
           p.vy = 0;
           p.stun = 0.25;
@@ -1264,8 +1267,8 @@ function updateTraps(g, dt) {
                     p.vy = 14 * p.gravDir;
                     p.onGround = false;
                   } else {
-                    p.x = g.level.start.x;
-                    p.y = g.level.start.y;
+                    p.x = p.prevX = g.level.start.x;
+                    p.y = p.prevY = g.level.start.y;
                     p.vx = 0;
                     p.vy = 0;
                     p.stun = 0.25;

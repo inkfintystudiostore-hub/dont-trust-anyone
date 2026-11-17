@@ -79,7 +79,7 @@ export function createDiorama(scene, levels, models) {
       const m = nodeMeshes[i];
       if (i === selected) m.material = MAT.active;
       else if (save.bestDeaths[i] !== undefined) m.material = MAT.cleared;
-      else if (isCoop ? i <= coopUnlocked : (!levels[i].coopOnly && (levels[i].world === 4 || i <= save.unlocked))) {
+      else if (isCoop ? i <= coopUnlocked : (!levels[i].coopOnly && i <= save.unlocked)) {
         m.material = MAT.open;
       } else m.material = MAT.locked;
     }

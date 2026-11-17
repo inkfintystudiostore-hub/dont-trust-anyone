@@ -343,3 +343,17 @@ describe('analog moveX + co-op coordination traps', () => {
     expect(guest.players[1].x).toBeLessThan(1.5);
   });
 });
+
+describe('pie slow on guest prediction', () => {
+  it('matches the host instead of compounding every tick', () => {
+    const ci = LEVELS.findIndex((l) => l.coopOnly);
+    const guest = createGame(LEVELS, ci, { coop: true });
+    const host = createGame(LEVELS, ci, { coop: true });
+    guest.players[1].pieTimer = host.players[1].pieTimer = 1.4;
+    for (let i = 0; i < 10; i++) {
+      stepPlayerLocal(guest, 1, RIGHT, DT);
+      step(host, [NONE, RIGHT], DT);
+    }
+    expect(guest.players[1].vx).toBeCloseTo(host.players[1].vx, 5);
+  });
+});
