@@ -28,6 +28,8 @@ const GEO = {
   backdrop: new PlaneGeometry(1, 1),
   shadowDisc: new CircleGeometry(0.42, 20),
   signLabel: new PlaneGeometry(1.52, 0.68),
+  icicle: new ConeGeometry(0.2, 0.75, 10),
+  saw: new CylinderGeometry(0.44, 0.44, 0.12, 14),
 };
 
 const THEMES = {
@@ -100,6 +102,8 @@ const MAT = {
   candle: new MeshStandardMaterial({ color: '#fff4e0', roughness: 0.6 }),
   flame: new MeshStandardMaterial({ color: '#ffbe0b', emissive: '#ff8800', emissiveIntensity: 0.9 }),
   plate: new MeshStandardMaterial({ color: '#3b3330', roughness: 0.5, metalness: 0.3 }),
+  saw: new MeshStandardMaterial({ color: '#d9d4e6', roughness: 0.25, metalness: 0.7 }),
+  jelly: new MeshStandardMaterial({ color: '#ffb3c7', emissive: '#ff8fab', emissiveIntensity: 0.15, roughness: 0.25 }),
 };
 
 const SPIKE_X = [0.2, 0.5, 0.8];
@@ -525,6 +529,48 @@ export function buildWorld(scene, level, models) {
     } else if (d.kind === 'portalWall') {
       v = models.portal_gate ? models.portal_gate.clone(true) : new Group();
       v.position.set(d.cx + 0.5, d.cy, 0);
+    } else if (d.kind === 'icicle') {
+      // looks exactly like a static ceiling spike until it drops
+      v = new Group();
+      const body = models.candy_icicle ? models.candy_icicle.clone(true) : new Mesh(GEO.icicle, MAT.spike);
+      body.rotation.x = Math.PI;
+      body.position.y = models.candy_icicle ? 1 : 0.6;
+      v.add(body);
+      v.position.set(d.cx + 0.5, d.cy, 0);
+    } else if (d.kind === 'closingWall') {
+      v = new Group();
+      v.add(new Mesh(GEO.block, theme.dirt));
+      v.position.set(d.cx + 0.5, d.cy + 0.5, 0);
+      v.visible = false;
+    } else if (d.kind === 'risingFloor') {
+      v = new Group();
+      v.add(new Mesh(GEO.block, theme.dirt));
+      const grass = new Mesh(GEO.grass, theme.grass);
+      grass.position.y = 0.42;
+      v.add(grass);
+      v.position.set(d.cx + 0.5, d.cy + 0.5, 0);
+    } else if (d.kind === 'saw') {
+      v = new Group();
+      const blade = models.saw_blade ? models.saw_blade.clone(true) : new Mesh(GEO.saw, MAT.saw);
+      if (!models.saw_blade) blade.rotation.x = Math.PI / 2;
+      blade.position.y = models.saw_blade ? 0 : 0.46;
+      v.userData.blade = blade;
+      v.add(blade);
+      v.position.set(d.cx + 0.5, d.cy, 0);
+      if (d.popup > 0) v.visible = false;
+    } else if (d.kind === 'sizeSwell') {
+      v = new Mesh(GEO.pad, MAT.jelly);
+      v.position.set(d.cx + 0.5, d.cy + 0.06, 0);
+    } else if (d.kind === 'spikeSwap') {
+      v = new Group();
+      for (const x of SPIKE_X) for (const z of SPIKE_Z) {
+        const s = new Mesh(GEO.spike, MAT.spike);
+        s.position.set(x - 0.5, 0.25, z);
+        v.add(s);
+      }
+      v.position.set(d.cx + 0.5, d.cy, 0);
+      v.scale.y = 0.01;
+      v.visible = false;
     }
 
     if (v) {
@@ -881,6 +927,29 @@ export function buildWorld(scene, level, models) {
         const s = 1 + Math.sin(time * 6) * 0.07;
         v.scale.set(s, 1 + Math.cos(time * 6) * 0.05, s);
         v.position.y = tr.cy + Math.sin(time * 3.5) * 0.08;
+      } else if (tr.kind === 'icicle') {
+        v.visible = tr.state !== 'done';
+        v.position.y = tr.cy + tr.offsetY;
+      } else if (tr.kind === 'closingWall') {
+        const closed = tr.state === 'closed';
+        v.userData.u = closed ? Math.min(1, (v.userData.u ?? 0) + dt * 18) : 0; // fast slam-up
+        v.visible = closed;
+        v.position.y = tr.cy + 0.5 - (1 - v.userData.u);
+      } else if (tr.kind === 'risingFloor') {
+        v.position.y = tr.cy + 0.5 + tr.offsetY;
+      } else if (tr.kind === 'saw') {
+        const hidden = tr.popup > 0 && tr.state === 'idle';
+        v.visible = !hidden;
+        const ix = (tr.prevX ?? tr.x) + (tr.x - (tr.prevX ?? tr.x)) * alpha;
+        const iy = (tr.prevY ?? tr.y) + (tr.y - (tr.prevY ?? tr.y)) * alpha;
+        v.position.set(ix, iy, 0);
+        if (v.userData.blade) v.userData.blade.rotation.z -= dt * 14;
+      } else if (tr.kind === 'sizeSwell') {
+        v.scale.y = tr.triggered ? Math.max(0.2, v.scale.y - dt * 4) : 1;
+      } else if (tr.kind === 'spikeSwap') {
+        const target = tr.active ? 1 : 0.01;
+        v.scale.y += (target - v.scale.y) * damp(30, dt);
+        v.visible = tr.active || v.scale.y > 0.03;
       }
     }
 
@@ -1030,7 +1099,12 @@ export function buildWorld(scene, level, models) {
         if (v.userData.top && v.userData.baseGrass) v.userData.top.material = v.userData.baseGrass;
       } else if (tr.kind === 'syncPlate') {
         v.scale.y = tr.pressed ? 0.55 : 1.0;
-      }
+      } else if (tr.kind === 'icicle') { v.visible = true; v.position.y = tr.cy; }
+      else if (tr.kind === 'closingWall') { v.visible = false; v.userData.u = 0; }
+      else if (tr.kind === 'risingFloor') v.position.y = tr.cy + 0.5;
+      else if (tr.kind === 'saw') { v.visible = !(tr.popup > 0); v.position.set(tr.x, tr.y, 0); }
+      else if (tr.kind === 'sizeSwell') v.scale.y = 1;
+      else if (tr.kind === 'spikeSwap') { v.scale.y = 0.01; v.visible = false; }
     }
   }
 

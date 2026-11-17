@@ -12,11 +12,11 @@ function memoryStorage(initial = {}) {
 describe('save persistence', () => {
   it('returns clean defaults when storage is missing or corrupt', () => {
     expect(loadSave(null)).toEqual({ unlocked: 0, bestDeaths: {}, totalDeaths: 0, muted: false, assist: false });
-    const bad = memoryStorage({ 'dta.save.v1': '{broken json' });
+    const bad = memoryStorage({ 'dta.save.v2': '{broken json' });
     expect(loadSave(bad)).toEqual({ unlocked: 0, bestDeaths: {}, totalDeaths: 0, muted: false, assist: false });
 
     const poisoned = memoryStorage({
-      'dta.save.v1': JSON.stringify({
+      'dta.save.v2': JSON.stringify({
         unlocked: -5,
         totalDeaths: 'NaN',
         bestDeaths: { 0: '<img src=x onerror=alert(1)>', 1: -2, 2: 4 },
@@ -24,7 +24,7 @@ describe('save persistence', () => {
     });
     expect(loadSave(poisoned)).toEqual({ unlocked: 0, bestDeaths: { 2: 4 }, totalDeaths: 0, muted: false, assist: false });
 
-    const arrBest = memoryStorage({ 'dta.save.v1': JSON.stringify({ bestDeaths: [1, 2] }) });
+    const arrBest = memoryStorage({ 'dta.save.v2': JSON.stringify({ bestDeaths: [1, 2] }) });
     expect(loadSave(arrBest).bestDeaths).toEqual({});
   });
 

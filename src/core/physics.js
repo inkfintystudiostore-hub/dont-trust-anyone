@@ -32,6 +32,7 @@ export function movePlayer(p, dir, jumpPressed, dt, isSolid, hit) {
   p.landed = false;
 
   const gDir = p.gravDir ?? 1;
+  const hw = p.halfW ?? PHYS.halfW, ht = p.height ?? PHYS.height; // per-player size (size swell)
   const target = dir * PHYS.move * (p.speedMul ?? 1) + (p.beltVx ?? 0);
   const reversingAir = !p.onGround && dir !== 0 && p.vx * dir < 0;
   const accelRate = p.onGround ? PHYS.accelGround : (reversingAir ? PHYS.airReverseAccel : PHYS.accelAir);
@@ -50,32 +51,32 @@ export function movePlayer(p, dir, jumpPressed, dt, isSolid, hit) {
 
   // horizontal
   p.x += p.vx * dt;
-  const y0 = Math.floor(p.y + EPS), y1 = Math.floor(p.y + PHYS.height - EPS);
+  const y0 = Math.floor(p.y + EPS), y1 = Math.floor(p.y + ht - EPS);
   if (p.vx > 0) {
-    const cx = Math.floor(p.x + PHYS.halfW);
-    for (let cy = y0; cy <= y1; cy++) if (isSolid(cx, cy)) { p.x = cx - PHYS.halfW - EPS; p.vx = 0; hit.wallCx = cx; hit.wallCy = cy; break; }
+    const cx = Math.floor(p.x + hw);
+    for (let cy = y0; cy <= y1; cy++) if (isSolid(cx, cy)) { p.x = cx - hw - EPS; p.vx = 0; hit.wallCx = cx; hit.wallCy = cy; break; }
   } else if (p.vx < 0) {
-    const cx = Math.floor(p.x - PHYS.halfW);
-    for (let cy = y0; cy <= y1; cy++) if (isSolid(cx, cy)) { p.x = cx + 1 + PHYS.halfW + EPS; p.vx = 0; hit.wallCx = cx; hit.wallCy = cy; break; }
+    const cx = Math.floor(p.x - hw);
+    for (let cy = y0; cy <= y1; cy++) if (isSolid(cx, cy)) { p.x = cx + 1 + hw + EPS; p.vx = 0; hit.wallCx = cx; hit.wallCy = cy; break; }
   }
 
   // vertical
   const wasGround = p.onGround;
   p.y += p.vy * dt;
   p.onGround = false;
-  const x0 = Math.floor(p.x - PHYS.halfW + EPS), x1 = Math.floor(p.x + PHYS.halfW - EPS);
+  const x0 = Math.floor(p.x - hw + EPS), x1 = Math.floor(p.x + hw - EPS);
   if (p.vy * gDir <= 0) {
-    const cy = gDir > 0 ? Math.floor(p.y) : Math.floor(p.y + PHYS.height);
+    const cy = gDir > 0 ? Math.floor(p.y) : Math.floor(p.y + ht);
     for (let cx = x0; cx <= x1; cx++) if (isSolid(cx, cy)) {
-      p.y = gDir > 0 ? cy + 1 : cy - PHYS.height;
+      p.y = gDir > 0 ? cy + 1 : cy - ht;
       p.vy = 0;
       p.onGround = true;
       break;
     }
   } else {
-    const cy = gDir > 0 ? Math.floor(p.y + PHYS.height) : Math.floor(p.y);
+    const cy = gDir > 0 ? Math.floor(p.y + ht) : Math.floor(p.y);
     for (let cx = x0; cx <= x1; cx++) if (isSolid(cx, cy)) {
-      p.y = gDir > 0 ? cy - PHYS.height - EPS : cy + 1 + EPS;
+      p.y = gDir > 0 ? cy - ht - EPS : cy + 1 + EPS;
       p.vy = 0;
       hit.bonkCx = cx;
       hit.bonkCy = cy;
@@ -87,5 +88,5 @@ export function movePlayer(p, dir, jumpPressed, dt, isSolid, hit) {
 
 /** True if the player box overlaps [ax0,ax1]x[ay0,ay1]. */
 export function overlaps(p, ax0, ay0, ax1, ay1) {
-  return p.x + PHYS.halfW > ax0 && p.x - PHYS.halfW < ax1 && p.y + PHYS.height > ay0 && p.y < ay1;
+  return p.x + (p.halfW ?? PHYS.halfW) > ax0 && p.x - (p.halfW ?? PHYS.halfW) < ax1 && p.y + (p.height ?? PHYS.height) > ay0 && p.y < ay1;
 }

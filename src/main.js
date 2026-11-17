@@ -494,7 +494,7 @@ function renderMapGrid(focusSelected = false) {
     if (save.bestDeaths[i] !== undefined) btn.classList.add('done');
     const locked = coopRole
       ? i > coopUnlocked
-      : (Boolean(LEVELS[i]?.coopOnly) || (i < 30 && i > save.unlocked));
+      : (Boolean(LEVELS[i]?.coopOnly) || i > save.unlocked);
     btn.disabled = locked;
 
     const top = document.createElement('span');
@@ -515,7 +515,7 @@ function renderMapGrid(focusSelected = false) {
   const sel = LEVELS[mapSelected];
   const selLocked = coopRole
     ? mapSelected > coopUnlocked
-    : (Boolean(sel?.coopOnly) || (mapSelected < 30 && mapSelected > save.unlocked));
+    : (Boolean(sel?.coopOnly) || mapSelected > save.unlocked);
   $('map-selected-title').textContent = sel
     ? (selLocked && sel.coopOnly && !coopRole ? `Level ${mapSelected + 1}: ${t('map.lockedCoop')}` : `Level ${mapSelected + 1}: ${t(sel.name)}`)
     : '';
@@ -664,7 +664,7 @@ $('map-close').addEventListener('click', () => {
 });
 $('map-play').addEventListener('click', async () => {
   ensureDefaultFullscreen();
-  if (!coopRole && (LEVELS[mapSelected]?.coopOnly || (mapSelected < 30 && mapSelected > save.unlocked))) {
+  if (!coopRole && (LEVELS[mapSelected]?.coopOnly || mapSelected > save.unlocked)) {
     return;
   }
   if (coopRole === 'host') {

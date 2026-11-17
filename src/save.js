@@ -1,4 +1,4 @@
-const KEY = 'dta.save.v1';
+const KEY = 'dta.save.v2';
 
 function defaultSave() {
   return { unlocked: 0, bestDeaths: {}, totalDeaths: 0, muted: false, assist: false };

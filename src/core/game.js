@@ -12,6 +12,8 @@ import { PHYS, movePlayer, overlaps } from './physics.js';
 export const DEATH_PAUSE = 0.6; // seconds the splat shows before respawn
 export const STUN = 0.35; // seconds of no control after bonking an invisible block
 const PIT_Y = -2;
+const hw = (p) => p.halfW ?? PHYS.halfW;
+const ht = (p) => p.height ?? PHYS.height;
 const IDLE_IN = { left: false, right: false, down: false, jump: false };
 
 function createPlayerState() {
@@ -21,6 +23,7 @@ function createPlayerState() {
     flipped: 0, beltVx: 0, speedMul: 1, jumpMul: 1, gravDir: 1, atDoor: false, prevJump: false,
     pieTimer: 0, danceTimer: 0, magnetPull: 0, trapAnim: null, trapAnimTimer: 0,
     portalCd: 0, _lockedNotified: false, _shrunkNotified: false,
+    size: 1, sizeTimer: 0, halfW: PHYS.halfW, height: PHYS.height,
     hit: { bonkCx: -1, bonkCy: -1, wallCx: -1, wallCy: -1 },
   };
 }
@@ -41,6 +44,23 @@ export function createGame(levels, levelIndex = 0, opts = {}) {
   g.isSolid = (cx, cy) => isSolid(g, cx, cy);
   loadLevel(g, levelIndex);
   return g;
+}
+
+/**
+ * Deep copy of a running game for search tools (solver). Levels are shared read-only.
+ * @example const c = cloneGame(g); step(c, { right: true }, 1 / 60); // g unchanged
+ */
+export function cloneGame(g) {
+  // Shallow per-object copies: trap/player fields are flat; nested trap data (stops, to) is read-only.
+  const c = { ...g, events: [], _wants: [...g._wants], solid: g.solid.slice() };
+  c.players = g.players.map((p) => ({ ...p, hit: { ...p.hit } }));
+  c.player = c.players[0];
+  c.hit = c.player.hit;
+  c.traps = g.traps.map((t) => ({ ...t }));
+  c.bluffDoor = g.bluffDoor ? c.traps[g.traps.indexOf(g.bluffDoor)] : null;
+  c.door = g.door ? { ...g.door } : null;
+  c.isSolid = (cx, cy) => isSolid(c, cx, cy);
+  return c;
 }
 
 export function loadLevel(g, index) {
@@ -85,7 +105,7 @@ function resetLevel(g) {
     if (t.kind === 'fallingFloor' || t.kind === 'launchFloor' || t.kind === 'antiJump' ||
         t.kind === 'invisibleBlock' || t.kind === 'conveyor' || t.kind === 'slowFloor' ||
         t.kind === 'springTrap' || t.kind === 'discoFloor' || t.kind === 'weightBridge' ||
-        t.kind === 'shyPlatform' || t.kind === 'hungryFloor') {
+        t.kind === 'shyPlatform' || t.kind === 'hungryFloor' || t.kind === 'risingFloor') {
       g.solid[t.cell] = 1;
     }
     if (t.kind === 'weightBridge') g.hasWeightBridge = true;
@@ -109,6 +129,7 @@ function resetLevel(g) {
       stun: 0, slip: 0, slipDir: 1, slipSpeed: 8.5, flipped: 0, beltVx: 0, speedMul: 1, jumpMul: 1,
       gravDir: 1, atDoor: false, prevJump: false, portalCd: 0, _lockedNotified: false, _shrunkNotified: false,
       pieTimer: 0, danceTimer: 0, magnetPull: 0, trapAnim: null, trapAnimTimer: 0,
+      size: 1, sizeTimer: 0, halfW: PHYS.halfW, height: PHYS.height,
     });
     p.hit.bonkCx = -1; p.hit.bonkCy = -1; p.hit.wallCx = -1; p.hit.wallCy = -1;
   }
@@ -175,6 +196,7 @@ function advancePlayer(g, pi, inp, dt, emitEvents) {
   p.pieTimer = Math.max(0, p.pieTimer - dt);
   p.danceTimer = Math.max(0, p.danceTimer - dt);
   p.portalCd = Math.max(0, p.portalCd - dt);
+  if (p.sizeTimer > 0 && (p.sizeTimer -= dt) <= 0) { p.size = 1; p.halfW = PHYS.halfW; p.height = PHYS.height; }
   p.trapAnimTimer = Math.max(0, p.trapAnimTimer - dt);
   if (p.trapAnimTimer <= 0) p.trapAnim = null;
   if (p.pieTimer > 0) p.speedMul *= 0.65;
@@ -271,7 +293,7 @@ function predictGuestTrapsLocal(g, playerIndex, dt) {
       case 'plateA':
       case 'plateB':
       case 'syncPlate':
-        if (p.onGround && p.x + PHYS.halfW > t.cx + 0.08 && p.x - PHYS.halfW < t.cx + 0.92 && Math.abs(p.y - t.cy) < 0.45) {
+        if (p.onGround && p.x + hw(p) > t.cx + 0.08 && p.x - hw(p) < t.cx + 0.92 && Math.abs(p.y - t.cy) < 0.45) {
           t.pressed = true;
         }
         break;
@@ -391,11 +413,11 @@ function hasPendingDoorRun(g) {
 }
 
 function footCellY(p) {
-  return p.gravDir < 0 ? Math.floor(p.y + PHYS.height + 0.01) : Math.floor(p.y - 0.01);
+  return p.gravDir < 0 ? Math.floor(p.y + ht(p) + 0.01) : Math.floor(p.y - 0.01);
 }
 
 function standingOn(p, cx, cy) {
-  return !p.atDoor && p.onGround && footCellY(p) === cy && p.x + PHYS.halfW > cx && p.x - PHYS.halfW < cx + 1;
+  return !p.atDoor && p.onGround && footCellY(p) === cy && p.x + hw(p) > cx && p.x - hw(p) < cx + 1;
 }
 
 function updateTraps(g, dt) {
@@ -430,7 +452,7 @@ function updateTraps(g, dt) {
       let on = false;
       for (let pi = 0; pi < players.length; pi++) {
         const p = players[pi];
-        if (!p.atDoor && p.onGround && p.x + PHYS.halfW > t.cx + 0.08 && p.x - PHYS.halfW < t.cx + 0.92 && Math.abs(p.y - t.cy) < 0.45) {
+        if (!p.atDoor && p.onGround && p.x + hw(p) > t.cx + 0.08 && p.x - hw(p) < t.cx + 0.92 && Math.abs(p.y - t.cy) < 0.45) {
           on = true;
           break;
         }
@@ -444,7 +466,7 @@ function updateTraps(g, dt) {
     let on = false;
     for (let pi = 0; pi < players.length; pi++) {
       const p = players[pi];
-      if (!p.atDoor && p.onGround && p.x + PHYS.halfW > t.cx + 0.08 && p.x - PHYS.halfW < t.cx + 0.92 && Math.abs(p.y - t.cy) < 0.45) {
+      if (!p.atDoor && p.onGround && p.x + hw(p) > t.cx + 0.08 && p.x - hw(p) < t.cx + 0.92 && Math.abs(p.y - t.cy) < 0.45) {
         on = true;
         break;
       }
@@ -552,7 +574,7 @@ function updateTraps(g, dt) {
           for (let pi = 0; pi < players.length; pi++) {
             const p = players[pi];
             if (!p.atDoor && p.vy * p.gravDir <= 2 && overlaps(p, t.cx + 0.15, t.cy, t.cx + 0.85, t.cy + 0.55)) {
-              p.y = p.gravDir > 0 ? Math.max(p.y, t.cy + 0.08) : Math.min(p.y, t.cy + 0.92 - PHYS.height);
+              p.y = p.gravDir > 0 ? Math.max(p.y, t.cy + 0.08) : Math.min(p.y, t.cy + 0.92 - ht(p));
               p.vy = PHYS.jump * t.boost * p.gravDir;
               p.onGround = false;
               p.coyote = 0;
@@ -1271,6 +1293,164 @@ function updateTraps(g, dt) {
         }
         break;
       }
+      case 'icicle': {
+        if (t.state === 'idle') {
+          for (let pi = 0; pi < players.length; pi++) {
+            const p = players[pi];
+            if (!p.atDoor && Math.abs(p.x - (t.cx + 0.5)) < t.radius && p.y < t.cy && p.y > t.cy - 9) {
+              t.state = 'armed'; t.timer = t.delay;
+              g.lastTrapIndex = i; g.lastTrapTime = g.time;
+              break;
+            }
+          }
+        } else if (t.state === 'armed') {
+          if ((t.timer -= dt) <= 0) { t.state = 'falling'; emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 }); }
+        } else if (t.state === 'falling') {
+          t.vy = Math.max(-PHYS.maxFall, t.vy - PHYS.gravity * dt);
+          t.offsetY += t.vy * dt;
+          const tipY = t.cy + t.offsetY;
+          if (tipY < PIT_Y || isSolid(g, t.cx, Math.floor(tipY))) { t.state = 'done'; break; }
+          for (let pi = 0; pi < players.length; pi++) {
+            const p = players[pi];
+            if (!p.atDoor && overlaps(p, t.cx + 0.3, tipY, t.cx + 0.7, tipY + 0.9)) die(g, 'icicle', i, pi);
+          }
+        }
+        break;
+      }
+      case 'closingWall': {
+        if (t.state === 'idle') {
+          for (let pi = 0; pi < players.length; pi++) {
+            const p = players[pi];
+            const line = t.cx + 0.5 + t.dx;
+            // fires when a player crosses the trigger line in either direction
+            if (!p.atDoor && Math.abs(p.y - t.cy) < 3 && p.prevX !== p.x && (p.prevX - line) * (p.x - line) <= 0) {
+              t.state = 'closing'; t.timer = t.delay;
+              g.lastTrapIndex = i; g.lastTrapTime = g.time;
+              break;
+            }
+          }
+        } else if (t.state === 'closing' && (t.timer -= dt) <= 0) {
+          t.state = 'closed';
+          g.solid[t.cell] = 1;
+          emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 });
+          for (let pi = 0; pi < players.length; pi++) {
+            const p = players[pi];
+            if (!p.atDoor && overlaps(p, t.cx + 0.05, t.cy, t.cx + 0.95, t.cy + 1)) die(g, 'crushed', i, pi);
+          }
+        }
+        break;
+      }
+      case 'risingFloor': {
+        if (t.state === 'idle') {
+          for (let pi = 0; pi < players.length; pi++) {
+            if (!standingOn(players[pi], t.cx, t.cy)) continue;
+            // the whole contiguous strip in this row rises together
+            for (const o of g.traps) {
+              if (o.kind === 'risingFloor' && o.state === 'idle' && o.cy === t.cy && Math.abs(o.cx - t.cx) <= 6) {
+                o.state = 'armed'; o.timer = o.delay; o.curCy = o.cy;
+              }
+            }
+            g.lastTrapIndex = i; g.lastTrapTime = g.time;
+            emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 });
+            break;
+          }
+        } else if (t.state === 'armed') {
+          if ((t.timer -= dt) <= 0) { t.state = 'rising'; t.timer = 1 / t.speed; }
+        } else if (t.state === 'rising') {
+          t.offsetY = Math.min(t.offsetY + t.speed * dt, (t.curCy ?? t.cy) + 1 - t.cy);
+          if ((t.timer -= dt) <= 0) {
+            const from = t.curCy ?? t.cy;
+            const to = from + 1;
+            const L = g.level;
+            if (to >= L.H || to - t.cy > t.rise || isSolid(g, t.cx, to)) { t.state = 'up'; t.offsetY = from - t.cy; break; }
+            g.solid[from * L.W + t.cx] = 0;
+            g.solid[to * L.W + t.cx] = 1;
+            t.curCy = to;
+            t.offsetY = to - t.cy;
+            t.timer += 1 / t.speed;
+            for (let pi = 0; pi < players.length; pi++) {
+              const p = players[pi];
+              if (p.atDoor || p.gravDir < 0) continue;
+              if (p.x + hw(p) > t.cx && p.x - hw(p) < t.cx + 1 && p.y >= from + 0.9 && p.y <= to + 0.1) {
+                p.y = to + 1;
+                p.vy = Math.max(p.vy, 0);
+                p.onGround = true;
+                const head = Math.floor(p.y + ht(p) - 1e-4);
+                for (let cx = Math.floor(p.x - hw(p) + 1e-4); cx <= Math.floor(p.x + hw(p) - 1e-4); cx++) {
+                  if (isSolid(g, cx, head)) { die(g, 'crushed', i, pi); break; }
+                }
+              }
+            }
+          }
+        }
+        break;
+      }
+      case 'saw': {
+        if (t.popup > 0 && t.state === 'idle') {
+          for (let pi = 0; pi < players.length; pi++) {
+            const p = players[pi];
+            if (!p.atDoor && Math.abs(p.x - t.x) < t.popup && Math.abs(p.y - t.cy) < 3) {
+              t.state = 'moving'; t.vx = t.dir * t.speed;
+              emit(g, 'trap', { kind: t.kind, x: t.x, y: t.y });
+              break;
+            }
+          }
+          break;
+        }
+        if (t.state === 'idle') { t.state = 'moving'; t.vx = t.dir * t.speed; }
+        if (t.speed > 0 && t.range > 0) {
+          const home = t.axis === 'y' ? t.cy : t.cx + 0.5;
+          const pos = t.axis === 'y' ? t.y : t.x;
+          const lo = Math.min(home, home + t.dir * t.range), hi = Math.max(home, home + t.dir * t.range);
+          let next = pos + t.vx * dt;
+          if (next > hi) { next = 2 * hi - next; t.vx = -Math.abs(t.vx); }
+          else if (next < lo) { next = 2 * lo - next; t.vx = Math.abs(t.vx); }
+          if (t.axis === 'y') t.y = next; else t.x = next;
+        }
+        for (let pi = 0; pi < players.length; pi++) {
+          const p = players[pi];
+          if (!p.atDoor && overlaps(p, t.x - 0.36, t.y + 0.1, t.x + 0.36, t.y + 0.82)) die(g, 'saw', i, pi);
+        }
+        break;
+      }
+      case 'sizeSwell': {
+        if (!t.triggered) {
+          for (let pi = 0; pi < players.length; pi++) {
+            const p = players[pi];
+            if (!p.atDoor && overlaps(p, t.cx + 0.1, t.cy, t.cx + 0.9, t.cy + 0.6)) {
+              t.triggered = true;
+              p.size = t.scale;
+              p.sizeTimer = t.duration;
+              p.halfW = PHYS.halfW * t.scale;
+              p.height = PHYS.height * t.scale;
+              p.trapAnim = 'swell';
+              p.trapAnimTimer = 0.5;
+              g.lastTrapIndex = i; g.lastTrapTime = g.time;
+              emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.3, playerIndex: pi });
+              break;
+            }
+          }
+        }
+        break;
+      }
+      case 'spikeSwap': {
+        for (let pi = 0; pi < players.length; pi++) {
+          const p = players[pi];
+          const bit = 1 << pi;
+          const inZone = !p.atDoor && overlaps(p, t.cx + 0.12, t.cy, t.cx + 0.88, t.cy + 0.5);
+          if (inZone && !(t.insideMask & bit)) {
+            t.step++;
+            if (t.step > t.after && !t.active) {
+              t.active = true;
+              g.lastTrapIndex = i; g.lastTrapTime = g.time;
+              emit(g, 'trap', { kind: t.kind, x: t.cx + 0.5, y: t.cy + 0.5 });
+            }
+          }
+          if (inZone) t.insideMask |= bit;
+          else t.insideMask &= ~bit;
+        }
+        break;
+      }
       default: break;
     }
   }
@@ -1286,8 +1466,8 @@ function checkHazards(g) {
     const p = g.players[pi];
     if (p.atDoor) continue;
     if (p.y < PIT_Y || p.y > L.H + 3) { die(g, 'pit', -1, pi); return; }
-    const x0 = Math.max(0, Math.floor(p.x - PHYS.halfW)), x1 = Math.min(L.W - 1, Math.floor(p.x + PHYS.halfW));
-    const y0 = Math.max(0, Math.floor(p.y)), y1 = Math.min(L.H - 1, Math.floor(p.y + PHYS.height));
+    const x0 = Math.max(0, Math.floor(p.x - hw(p))), x1 = Math.min(L.W - 1, Math.floor(p.x + hw(p)));
+    const y0 = Math.max(0, Math.floor(p.y)), y1 = Math.min(L.H - 1, Math.floor(p.y + ht(p)));
     for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
       if (L.tiles[cy * L.W + cx] !== TILE.SPIKES) continue;
       const sy = isCeilingSpike(L, cx, cy) ? cy + 0.5 : cy;
@@ -1299,7 +1479,11 @@ function checkHazards(g) {
         die(g, 'spikes', i, pi);
         return;
       }
-      if (t.kind === 'antiJump' && t.active && overlaps(p, t.cx + 0.12, t.cy + 0.95, t.cx + 0.88, t.cy + 1.55)) {
+      if (t.kind === 'spikeSwap' && t.active && overlaps(p, t.cx + 0.12, t.cy, t.cx + 0.88, t.cy + 0.6)) {
+        die(g, 'spikes', i, pi);
+        return;
+      }
+      if (t.kind === 'antiJump' && t.active &&overlaps(p, t.cx + 0.12, t.cy + 0.95, t.cx + 0.88, t.cy + 1.55)) {
         die(g, 'spikes', i, pi);
         return;
       }
@@ -1343,9 +1527,10 @@ export function exportCoopSnapshot(g, meta = null) {
       flipped: p.flipped, atDoor: p.atDoor, beltVx: p.beltVx, speedMul: p.speedMul,
       pieTimer: p.pieTimer, danceTimer: p.danceTimer, magnetPull: p.magnetPull,
       trapAnim: p.trapAnim, trapAnimTimer: p.trapAnimTimer,
+      size: p.size, sizeTimer: p.sizeTimer, halfW: p.halfW, height: p.height,
     })),
     traps: g.traps.reduce((acc, t, i) => {
-      const active = t.kind === 'boulder' || t.kind === 'crusher' || t.kind === 'boxingGlove'
+      const active = t.kind === 'boulder' || t.kind === 'crusher' || t.kind === 'boxingGlove' || t.kind === 'saw'
         || (t.state !== undefined && t.state !== 'idle')
         || t.offsetY !== 0 || t.ext !== 0 || t.revealed || t.active || t.triggered
         || t.collected || t.pressed || t.open || t.defused || t.defusing || (t.timer ?? 0) > 0;
@@ -1356,7 +1541,7 @@ export function exportCoopSnapshot(g, meta = null) {
         face: t.face, shy: t.shy, onGround: t.onGround, revealed: t.revealed,
         active: t.active, triggered: t.triggered, collected: t.collected, pressed: t.pressed,
         open: t.open, defuse: t.defuse, defused: t.defused, defusing: t.defusing,
-        timer: t.timer, stopIndex: t.stopIndex,
+        timer: t.timer, stopIndex: t.stopIndex, vy: t.vy, step: t.step, curCy: t.curCy, insideMask: t.insideMask,
       });
       return acc;
     }, []),
@@ -1432,6 +1617,10 @@ export function applyCoopSnapshot(g, snap, opts = null) {
         dst.magnetPull = src.magnetPull;
         dst.trapAnim = src.trapAnim;
         dst.trapAnimTimer = src.trapAnimTimer;
+        dst.size = src.size ?? 1;
+        dst.sizeTimer = src.sizeTimer ?? 0;
+        dst.halfW = src.halfW ?? PHYS.halfW;
+        dst.height = src.height ?? PHYS.height;
       } else {
         const teleported = respawned || err > 2.5;
         const curX = dst.prevX + (dst.x - dst.prevX) * snapAlpha;
@@ -1463,6 +1652,12 @@ export function applyCoopSnapshot(g, snap, opts = null) {
         g.solid[dst.cell] = 0;
       } else if (dst.kind === 'fallingFloor' || dst.kind === 'launchFloor') {
         g.solid[dst.cell] = 1;
+      } else if (dst.kind === 'closingWall') {
+        g.solid[dst.cell] = dst.state === 'closed' ? 1 : 0;
+      } else if (dst.kind === 'risingFloor') {
+        const W = g.level.W;
+        for (let cy = dst.cy; cy <= dst.cy + dst.rise && cy < g.level.H; cy++) if (g.level.tiles[cy * W + dst.cx] !== TILE.SOLID) g.solid[cy * W + dst.cx] = 0;
+        g.solid[(dst.curCy ?? dst.cy) * W + dst.cx] = 1;
       }
     }
   }

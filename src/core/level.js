@@ -9,6 +9,8 @@
  *   A  anti-jump     J  mystery gift box    E  mirror robot    Q  peek-a-boo ghost
  *   *  golden key    H  hold plate A        =  hazard gate A   h  hold plate B
  *   -  hazard gate B @  co-op bomb
+ *   ;  ceiling icicle (drops)    ]  closing wall (slams shut past a line)   [  rising floor
+ *   &  patrol saw    {  size swell (giant)   ,  spike-swap tile (safe twice, spikes on 3rd pass)
  *   any other letter/digit: marker (e.g. T, 1..9 = door run targets)
  * `traps` tunes trap chars: { at: 'S', delay, radius } or { at: 'D', runTo: 'T' | ['1','2'], radius }.
  *
@@ -60,9 +62,16 @@ const TRAP_BUILDERS = {
   '/': (base, cfg) => ({ kind: 'shyPlatform', ...base, shift: cfg.shift ?? 2, triggerDist: cfg.triggerDist ?? 5.0 }),
   '(': (base, cfg) => ({ kind: 'hungryFloor', ...base, delay: cfg.delay ?? 0.4, spitUp: !!cfg.spitUp }),
   '|': (base, cfg) => ({ kind: 'portalWall', ...base, toMarker: cfg.to ?? null }),
+  // Level Devil set (2026-11-17). Symbols, not letters, so marker letters stay free.
+  ';': (base, cfg) => ({ kind: 'icicle', ...base, delay: cfg.delay ?? 0.05, radius: cfg.radius ?? 2.2 }),
+  ']': (base, cfg) => ({ kind: 'closingWall', ...base, dx: cfg.dx ?? 1.2, delay: cfg.delay ?? 0.06 }),
+  '[': (base, cfg) => ({ kind: 'risingFloor', ...base, rise: cfg.rise ?? 3, speed: cfg.speed ?? 6, delay: cfg.delay ?? 0.1 }),
+  '&': (base, cfg) => ({ kind: 'saw', ...base, dir: cfg.dir ?? 1, speed: cfg.speed ?? 3.5, range: cfg.range ?? 4, axis: cfg.axis ?? 'x', popup: cfg.popup ?? 0 }),
+  '{': (base, cfg) => ({ kind: 'sizeSwell', ...base, scale: cfg.scale ?? 2, duration: cfg.duration ?? 3.5 }),
+  ',': (base, cfg) => ({ kind: 'spikeSwap', ...base, after: cfg.after ?? 2 }),
 };
 
-export function parseLevel({ name, world = 1, coopOnly = false, rows, traps = [], signs = [], taunts = [] }) {
+export function parseLevel({ name, world = 1, coopOnly = false, breather = false, rows, traps = [], signs = [], taunts = [] }) {
   const H = rows.length;
   const W = Math.max(...rows.map((r) => r.length));
   const tiles = new Uint8Array(W * H);
@@ -109,5 +118,5 @@ export function parseLevel({ name, world = 1, coopOnly = false, rows, traps = []
   });
   if (door && stops.length) trapDefs.push({ kind: 'runningDoor', to: stops[0], stops, radius: doorCfg.radius ?? 2 });
 
-  return { name, world, coopOnly: !!coopOnly, W, H, tiles, start, door, markers, trapDefs, signs, taunts };
+  return { name, world, coopOnly: !!coopOnly, breather: !!breather, W, H, tiles, start, door, markers, trapDefs, signs, taunts };
 }

@@ -50,6 +50,7 @@ export function createMomo(bodyTemplate) {
   let idleTime = 0;
   let flipAngle = 0;
   let deathPose = null;
+  let sizeVis = 1;
   let deathElapsed = 0;
   let spinYaw = 0;
 
@@ -58,6 +59,8 @@ export function createMomo(bodyTemplate) {
     surprise() { surprise = 0.6; },
     onDeath(cause) { deathPose = cause; deathElapsed = 0; },
     reset() {
+      sizeVis = 1;
+      group.scale.setScalar(1);
       deathPose = null;
       deathElapsed = 0;
       squash = 0;
@@ -104,7 +107,7 @@ export function createMomo(bodyTemplate) {
           eyes.scale.set(1.7, 1.8, 1);
           return;
         }
-        if (deathPose === 'gate' || deathPose === 'spikes' || deathPose === 'chomp' || deathPose === 'robot' || deathPose === 'ghost') {
+        if (deathPose === 'gate' || deathPose === 'spikes' || deathPose === 'chomp' || deathPose === 'robot' || deathPose === 'ghost' || deathPose === 'icicle' || deathPose === 'saw') {
           group.visible = deathElapsed < 0.42;
           group.position.set(rx + Math.sin(t * 95) * 0.1, ry + deathElapsed * 1.4, z);
           pivot.scale.set(1.28, 0.84, 1.28);
@@ -126,6 +129,8 @@ export function createMomo(bodyTemplate) {
 
       group.visible = true;
       group.position.set(rx, ry, z);
+      sizeVis += ((p.size ?? 1) - sizeVis) * damp(12, dt); // size swell grows from the feet
+      group.scale.setScalar(sizeVis);
 
       const targetFlip = (p.gravDir ?? 1) < 0 ? Math.PI : 0;
       flipAngle += (targetFlip - flipAngle) * damp(14, dt);
