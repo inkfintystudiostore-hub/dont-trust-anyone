@@ -11,7 +11,9 @@ const damp = (rate, dt) => 1 - Math.exp(-rate * dt);
  * Momo/Mimi = Meshy body + code eyes (blink, wide surprise, velocity lag, sleepy)
  * + dt-independent squash/stretch and hilarious per-trap/death character animations.
  */
-export function createMomo(bodyTemplate, { eyeY: eyeFrac = 0.6 } = {}) {
+export function createMomo(bodyTemplate, { eyeY: eyeFrac = 0.6, eyeColor } = {}) {
+  // eyeColor: glowing eyes for skins whose face area is dark (Gojo's blindfold)
+  const eyeMat = eyeColor ? new MeshStandardMaterial({ color: eyeColor, emissive: eyeColor, emissiveIntensity: 0.9, roughness: 0.3 }) : EYE_MAT;
   const group = new Group();     // world position (feet)
   const flipPivot = new Group(); // flips upside-down around body center when gravDir < 0
   flipPivot.position.y = PHYS.height * 0.5;
@@ -30,7 +32,7 @@ export function createMomo(bodyTemplate, { eyeY: eyeFrac = 0.6 } = {}) {
   const eyes = new Group();
   const eyeList = [];
   for (const sx of [-1, 1]) {
-    const eye = new Mesh(EYE_GEO, EYE_MAT);
+    const eye = new Mesh(EYE_GEO, eyeMat);
     eye.position.set(sx * 0.14, 0, 0);
     eye.scale.set(1, 1.25, 0.55);
     const shine = new Mesh(SHINE_GEO, SHINE_MAT);

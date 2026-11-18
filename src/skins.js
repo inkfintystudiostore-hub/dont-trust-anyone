@@ -2,8 +2,8 @@
 // h = model height in world units (hair/wings add height, so costumes get a little more room).
 export const SKINS = [
   { id: 'momo', name: 'Momo', tag: 'Original', h: 0.95, eyeY: 0.6 },
-  { id: 'naruto', name: 'Naruto', tag: 'Ninja', h: 1.05, eyeY: 0.5 },
-  { id: 'gojo', name: 'Gojo', tag: 'Sorcerer', h: 1.05, eyeY: 0.5 },
+  { id: 'naruto', name: 'Naruto', tag: 'Ninja', h: 1.05, eyeY: 0.62 },
+  { id: 'gojo', name: 'Gojo', tag: 'Sorcerer', h: 1.05, eyeY: 0.66, eyeColor: '#7fd8ff' },
   { id: 'goku', name: 'Goku', tag: 'Saiyan', h: 1.1, eyeY: 0.5 },
   { id: 'doraemon', name: 'Doraemon', tag: 'Robot cat', h: 0.95, eyeY: 0.62 },
   { id: 'princess', name: 'Princess', tag: 'Royal', h: 1.05, eyeY: 0.55 },

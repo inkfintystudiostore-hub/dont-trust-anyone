@@ -158,7 +158,7 @@ modelStore.preloadAll().catch(() => {});
 
 let game = createGame(LEVELS, startLevel);
 let world = buildWorld(scene, game.level, models);
-let momo = createMomo(models[save.skin], { eyeY: getSkin(save.skin).eyeY });
+let momo = createMomo(models[save.skin], getSkin(save.skin));
 const mimi = createMomo(models.mimi);
 mimi.group.visible = false;
 const confetti = createConfetti();
@@ -636,7 +636,7 @@ async function setSkin(id) {
   const k = getSkin(id);
   await modelStore.ensure([k.id]);
   const old = momo;
-  momo = createMomo(models[k.id], { eyeY: k.eyeY });
+  momo = createMomo(models[k.id], k);
   momo.group.visible = old.group.visible;
   scene.add(momo.group);
   scene.remove(old.group);
