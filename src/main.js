@@ -18,6 +18,13 @@ import { createSnapshotBuffer, createGuestReconciler, applyInterpolatedRemoteVis
 import { createCoopLobby } from './ui/lobby.js';
 import { hud } from './ui/hud.js';
 import { t, applyI18n } from './i18n.js';
+import { restoreAuthSession, subscribeAuth } from './auth.js';
+import { openAuthModal } from './ui/authModal.js';
+import { openShopModal } from './ui/shopModal.js';
+import { createAdBanner } from './ui/adBanners.js';
+import { showInterstitialAd } from './adAdapter.js';
+import { isVipActive, subscribeWallet } from './wallet.js';
+import { createVoiceChat } from './net/voiceChat.js';
 import {
   exitGameFullscreen, isFullscreenSupported, isInFullscreen,
   requestGameFullscreen, subscribeFullscreenChange,
@@ -34,6 +41,52 @@ coarseQuery.addEventListener?.('change', (e) => { isCoarsePointer = e.matches; }
 const $ = (id) => document.getElementById(id);
 
 applyI18n();
+restoreAuthSession();
+$('open-auth')?.addEventListener('click', openAuthModal);
+$('open-shop')?.addEventListener('click', () => openShopModal());
+const adSlotTop = import.meta.env.VITE_ADSENSE_SLOT_TOP || '';
+const adSlotBottom = import.meta.env.VITE_ADSENSE_SLOT_BOTTOM || '';
+const menuAdSlot = $('menu-ad-slot');
+if (menuAdSlot) menuAdSlot.appendChild(createAdBanner('bottom', adSlotBottom));
+const mapAdSlot = $('map-ad-slot');
+if (mapAdSlot) mapAdSlot.appendChild(createAdBanner('top', adSlotTop));
+const endAdSlot = $('end-ad-slot');
+if (endAdSlot) endAdSlot.appendChild(createAdBanner('bottom', adSlotBottom));
+const skinsAdSlot = $('skins-ad-slot');
+if (skinsAdSlot) skinsAdSlot.appendChild(createAdBanner('top', adSlotTop));
+subscribeAuth((st) => {
+  const btn = $('open-auth');
+  if (btn) btn.textContent = st.user ? `👤 ${st.user.displayName}` : '👤 Sign In';
+});
+const voiceChat = createVoiceChat({
+  onStateChange(st) {
+    const hudBtn = $('btn-voice');
+    const hudLabel = $('voice-label');
+    const lobbyBtn = $('coop-voice-btn');
+    const live = st.active && !st.muted;
+    if (hudBtn) {
+      hudBtn.classList.toggle('live', live);
+      hudBtn.setAttribute('aria-pressed', String(live));
+    }
+    if (hudLabel) hudLabel.textContent = live ? 'Live' : 'Mic';
+    if (lobbyBtn) {
+      lobbyBtn.textContent = live
+        ? '🎙️ Voice Chat: Live'
+        : (isVipActive() ? '🎙️ Voice Chat: Off' : '🎙️ Voice Chat (VIP)');
+    }
+  },
+});
+
+subscribeWallet((w) => {
+  const coinsEl = $('menu-coins');
+  if (coinsEl) coinsEl.textContent = (w.balance ?? 0).toLocaleString();
+  const vipEl = $('menu-vip-tag');
+  if (vipEl) vipEl.hidden = !w.vipActive;
+  const lobbyVoice = $('coop-voice-btn');
+  if (lobbyVoice && !voiceChat.getState().active) {
+    lobbyVoice.textContent = w.vipActive ? '🎙️ Voice Chat: Off' : '🎙️ Voice Chat (VIP)';
+  }
+});
 let save = loadSave();
 setMuted(save.muted);
 hud.muteIcon(save.muted);
@@ -204,7 +257,32 @@ let babbleTimer = 0;
 const camPos = new Vector3(game.player.x, game.player.y + 2, 14);
 const camLook = new Vector3();
 
+async function toggleCoopVoice() {
+  if (!isVipActive()) {
+    openShopModal('👑 Co-op Voice Chat requires VIP Monthly Pass (₹99/mo).');
+    return;
+  }
+  const st = voiceChat.getState();
+  try {
+    if (!st.active) {
+      await voiceChat.enableMic(lobby.session?.getPeerConnection?.());
+      hud.toast('🎙️ Voice Chat Live', 1500);
+    } else {
+      voiceChat.setMuted(!st.muted);
+      hud.toast(st.muted ? '🎙️ Mic On' : '🔇 Mic Muted', 1200);
+    }
+  } catch (err) {
+    hud.toast(err?.message || 'Could not access microphone', 2000);
+  }
+}
+
+$('btn-voice')?.addEventListener('click', toggleCoopVoice);
+$('coop-voice-btn')?.addEventListener('click', toggleCoopVoice);
+
 const lobby = createCoopLobby(LEVELS, {
+  onRemoteAudio(stream) {
+    if (isVipActive()) voiceChat.attachRemoteStream(stream);
+  },
   onSnapshot(snap) {
     if (playing && coopRole) hud.coopPresence(snap);
   },
@@ -502,7 +580,7 @@ function renderMapGrid(focusSelected = false) {
     if (save.bestDeaths[i] !== undefined) btn.classList.add('done');
     const locked = coopRole
       ? i > coopUnlocked
-      : (Boolean(LEVELS[i]?.coopOnly) || i > save.unlocked);
+      : (Boolean(LEVELS[i]?.coopOnly) || (!isVipActive() && i > save.unlocked));
     btn.disabled = locked;
 
     const top = document.createElement('span');
@@ -523,7 +601,7 @@ function renderMapGrid(focusSelected = false) {
   const sel = LEVELS[mapSelected];
   const selLocked = coopRole
     ? mapSelected > coopUnlocked
-    : (Boolean(sel?.coopOnly) || mapSelected > save.unlocked);
+    : (Boolean(sel?.coopOnly) || (!isVipActive() && mapSelected > save.unlocked));
   $('map-selected-title').textContent = sel
     ? (selLocked && sel.coopOnly && !coopRole ? `Level ${mapSelected + 1}: ${t('map.lockedCoop')}` : `Level ${mapSelected + 1}: ${t(sel.name)}`)
     : '';
@@ -696,7 +774,7 @@ $('map-close').addEventListener('click', () => {
 });
 $('map-play').addEventListener('click', async () => {
   ensureDefaultFullscreen();
-  if (!coopRole && (LEVELS[mapSelected]?.coopOnly || mapSelected > save.unlocked)) {
+  if (!coopRole && (LEVELS[mapSelected]?.coopOnly || (!isVipActive() && mapSelected > save.unlocked))) {
     return;
   }
   if (coopRole === 'host') {
@@ -971,7 +1049,10 @@ function onEvent(e) {
         break;
       }
       transitioning = true;
-      hud.iris(() => {
+      hud.iris(async () => {
+        if (!game.coop && !isVipActive() && (clearedLevel + 1) % 5 === 0) {
+          await showInterstitialAd('every_5_levels');
+        }
         // the next level may need models that are still downloading (slow guest phones)
         modelStore.ensure(modelsForLevel(game.level)).catch(() => {}).then(() => {
           transitioning = false;

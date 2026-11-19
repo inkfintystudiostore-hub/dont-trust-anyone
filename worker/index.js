@@ -4,6 +4,17 @@
  */
 import { DurableObject } from 'cloudflare:workers';
 import {
+  AccountDO,
+  createSessionToken,
+  extractBearerToken,
+  resolveAuthSecret,
+  validateUsername,
+  verifySessionToken,
+} from './auth.js';
+import { FIREBASE_PROJECT_ID, verifyFirebaseIdToken } from './firebaseAuth.js';
+import { handlePaymentRequest } from './payments.js';
+import { PlayerWalletDO } from './walletDO.js';
+import {
   ROOM_IDLE_TTL_MS,
   createRoomRecord,
   disconnectPlayer,
@@ -20,6 +31,60 @@ import {
 const MAX_WS_PAYLOAD_BYTES = 16384;
 const FRAME_ANCESTORS_CSP =
   "frame-ancestors 'self' https://inkfinitystudio.store https://www.inkfinitystudio.store http://localhost:* http://127.0.0.1:*";
+const HTML_CSP = `object-src 'none'; base-uri 'self'; ${FRAME_ANCESTORS_CSP}`;
+
+const ALLOWED_CORS_ORIGINS = new Set([
+  'https://dta.inkfinitystudio.store',
+  'https://inkfinitystudio.store',
+  'https://www.inkfinitystudio.store',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:8787',
+  'http://127.0.0.1:8787',
+]);
+
+const GUEST_ID_RE = /^guest:[a-zA-Z0-9_-]{8,58}$/;
+const PUBLIC_WALLET_ROUTES = new Map([
+  ['/state', 'GET'],
+  ['/deduct', 'POST'],
+  ['/claim-streak', 'POST'],
+  ['/ad-reward', 'POST'],
+]);
+
+const rateBuckets = new Map();
+function checkRateLimit(key, limit, windowMs = 60_000) {
+  const now = Date.now();
+  if (rateBuckets.size > 5000) {
+    for (const [k, v] of rateBuckets) {
+      if (v.resetAt <= now) rateBuckets.delete(k);
+    }
+  }
+  const entry = rateBuckets.get(key);
+  if (!entry || entry.resetAt <= now) {
+    rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (entry.count >= limit) return false;
+  entry.count += 1;
+  return true;
+}
+
+function getClientIp(request) {
+  return request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() || 'unknown';
+}
+
+async function resolveVerifiedWalletId(request, env) {
+  const token = extractBearerToken(request);
+  if (!token) return { ok: true, walletId: null };
+  const secret = resolveAuthSecret(env, request.url);
+  if (secret) {
+    const session = await verifySessionToken(token, secret);
+    if (session?.walletId) return { ok: true, walletId: session.walletId };
+  }
+  const claims = await verifyFirebaseIdToken(token, FIREBASE_PROJECT_ID);
+  if (claims?.uid) return { ok: true, walletId: `acct:${claims.uid}` };
+  return { ok: false, status: 401 };
+}
 
 function randomRoomCode() {
   const min = 100_000_000;
@@ -30,17 +95,32 @@ function randomRoomCode() {
   return String(min + (buf[0] % span));
 }
 
-function withCors(response) {
+function withCors(response, request) {
   const headers = new Headers(response.headers);
-  headers.set('Access-Control-Allow-Origin', '*');
+  const origin = request?.headers?.get('Origin');
+  if (origin && ALLOWED_CORS_ORIGINS.has(origin)) {
+    headers.set('Access-Control-Allow-Origin', origin);
+    headers.set('Vary', 'Origin');
+  }
   headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  headers.set('Access-Control-Allow-Headers', 'Content-Type');
+  headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (
+      url.hostname.endsWith('.workers.dev') &&
+      !url.pathname.startsWith('/api/') &&
+      !url.pathname.startsWith('/ws/') &&
+      (request.method === 'GET' || request.method === 'HEAD')
+    ) {
+      url.hostname = 'dta.inkfinitystudio.store';
+      url.protocol = 'https:';
+      url.port = '';
+      return Response.redirect(url.toString(), 301);
+    }
     const roomMatch = url.pathname.match(/^\/ws\/room\/(\d{9})$/);
 
     if (roomMatch) {
@@ -53,9 +133,12 @@ export default {
     }
 
     if (url.pathname === '/api/rooms/reserve') {
-      if (request.method === 'OPTIONS') return withCors(new Response(null, { status: 204 }));
+      if (request.method === 'OPTIONS') return withCors(new Response(null, { status: 204 }), request);
       if (request.method !== 'POST') {
-        return withCors(Response.json({ ok: false, error: 'Method not allowed' }, { status: 405 }));
+        return withCors(Response.json({ ok: false, error: 'Method not allowed' }, { status: 405 }), request);
+      }
+      if (!checkRateLimit(`reserve:${getClientIp(request)}`, 30)) {
+        return withCors(Response.json({ ok: false, error: 'Too many room requests. Please wait a minute.' }, { status: 429 }), request);
       }
       let levelIndex = 0;
       let candidate = null;
@@ -70,13 +153,158 @@ export default {
         const code = attempt === 0 && candidate ? candidate : randomRoomCode();
         const stub = env.GAME_ROOM.get(env.GAME_ROOM.idFromName(code));
         const res = await stub.fetch(`https://internal/reserve?code=${code}&level=${levelIndex}`, { method: 'POST' });
-        if (res.status === 200) return withCors(Response.json({ ok: true, code }));
+        if (res.status === 200) return withCors(Response.json({ ok: true, code }), request);
       }
-      return withCors(Response.json({ ok: false, error: 'Could not allocate unique room code' }, { status: 503 }));
+      return withCors(Response.json({ ok: false, error: 'Could not allocate unique room code' }, { status: 503 }), request);
     }
 
     if (url.pathname === '/api/health') {
-      return withCors(Response.json({ ok: true, service: 'dont-trust-anyone-do' }));
+      return withCors(Response.json({ ok: true, service: 'dont-trust-anyone-do' }), request);
+    }
+
+    if (url.pathname.startsWith('/api/auth/')) {
+      if (request.method === 'OPTIONS') return withCors(new Response(null, { status: 204 }), request);
+      const authSecret = resolveAuthSecret(env, request.url);
+      if (url.pathname === '/api/auth/me' && request.method === 'GET') {
+        if (!authSecret) {
+          return withCors(Response.json({ ok: false, error: 'Server auth secret not configured' }, { status: 500 }), request);
+        }
+        const token = extractBearerToken(request);
+        const session = token ? await verifySessionToken(token, authSecret) : null;
+        if (!session) return withCors(Response.json({ ok: false, error: 'Unauthorized' }, { status: 401 }), request);
+        const walletStub = env.PLAYER_WALLET.get(env.PLAYER_WALLET.idFromName(session.walletId));
+        const walletRes = await walletStub.fetch('https://internal/state');
+        const walletJson = await walletRes.json();
+        return withCors(Response.json({ ok: true, account: session, wallet: walletJson.wallet }), request);
+      }
+      if (request.method !== 'POST') {
+        return withCors(Response.json({ ok: false, error: 'Method not allowed' }, { status: 405 }), request);
+      }
+      if (!checkRateLimit(`auth:${getClientIp(request)}`, 20)) {
+        return withCors(Response.json({ ok: false, error: 'Too many auth attempts. Please wait a minute.' }, { status: 429 }), request);
+      }
+      let body = {};
+      try { body = await request.json(); } catch {
+        return withCors(Response.json({ ok: false, error: 'Invalid JSON' }, { status: 400 }), request);
+      }
+      if (url.pathname === '/api/auth/firebase-sync') {
+        const token = extractBearerToken(request);
+        const claims = token ? await verifyFirebaseIdToken(token, FIREBASE_PROJECT_ID) : null;
+        if (!claims) return withCors(Response.json({ ok: false, error: 'Invalid Firebase session' }, { status: 401 }), request);
+        const walletId = `acct:${claims.uid}`;
+        const accountWalletStub = env.PLAYER_WALLET.get(env.PLAYER_WALLET.idFromName(walletId));
+        const guestId = typeof body.guestPlayerId === 'string' ? body.guestPlayerId.trim() : '';
+        if (guestId && GUEST_ID_RE.test(guestId)) {
+          const guestStub = env.PLAYER_WALLET.get(env.PLAYER_WALLET.idFromName(guestId));
+          const guestStateRes = await guestStub.fetch('https://internal/state');
+          const guestStateJson = await guestStateRes.json();
+          if (guestStateRes.ok && guestStateJson.ok && guestStateJson.wallet) {
+            const importRes = await accountWalletStub.fetch('https://internal/import', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ wallet: guestStateJson.wallet }),
+            });
+            const importJson = await importRes.json();
+            if (!importJson.alreadyExists) {
+              await guestStub.fetch('https://internal/migrate-out', { method: 'POST' });
+            }
+          }
+        }
+        const walletRes = await accountWalletStub.fetch('https://internal/state');
+        const walletJson = await walletRes.json();
+        return withCors(Response.json({ ok: true, walletId, wallet: walletJson.wallet }), request);
+      }
+
+      if (!authSecret) {
+        return withCors(Response.json({ ok: false, error: 'Server auth secret not configured' }, { status: 500 }), request);
+      }
+      const userCheck = validateUsername(String(body.username ?? ''));
+      if (!userCheck.ok) return withCors(Response.json({ ok: false, error: userCheck.error }, { status: 400 }), request);
+      const accountStub = env.PLAYER_ACCOUNT.get(env.PLAYER_ACCOUNT.idFromName(userCheck.normalized));
+
+      if (url.pathname === '/api/auth/register') {
+        const regRes = await accountStub.fetch('https://internal/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: userCheck.username, password: body.password, displayName: body.displayName }),
+        });
+        const regJson = await regRes.json();
+        if (!regRes.ok || !regJson.ok || !regJson.account) return withCors(Response.json(regJson, { status: regRes.status }), request);
+        const token = await createSessionToken(regJson.account, authSecret);
+        const walletStub = env.PLAYER_WALLET.get(env.PLAYER_WALLET.idFromName(regJson.account.walletId));
+        const walletRes = await walletStub.fetch('https://internal/state');
+        const walletJson = await walletRes.json();
+        return withCors(Response.json({ ok: true, token, account: regJson.account, wallet: walletJson.wallet }), request);
+      }
+
+      if (url.pathname === '/api/auth/login') {
+        const loginRes = await accountStub.fetch('https://internal/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: body.password }),
+        });
+        const loginJson = await loginRes.json();
+        if (!loginRes.ok || !loginJson.ok || !loginJson.account) return withCors(Response.json(loginJson, { status: loginRes.status }), request);
+        const token = await createSessionToken(loginJson.account, authSecret);
+        const walletStub = env.PLAYER_WALLET.get(env.PLAYER_WALLET.idFromName(loginJson.account.walletId));
+        const walletRes = await walletStub.fetch('https://internal/state');
+        const walletJson = await walletRes.json();
+        return withCors(Response.json({ ok: true, token, account: loginJson.account, wallet: walletJson.wallet }), request);
+      }
+
+      return withCors(Response.json({ ok: false, error: 'Not found' }, { status: 404 }), request);
+    }
+
+    if (url.pathname.startsWith('/api/wallet/')) {
+      if (request.method === 'OPTIONS') return withCors(new Response(null, { status: 204 }), request);
+      const action = url.pathname.replace('/api/wallet', '');
+      const expectedMethod = PUBLIC_WALLET_ROUTES.get(action);
+      if (!expectedMethod) {
+        return withCors(Response.json({ ok: false, error: 'Forbidden wallet route' }, { status: 403 }), request);
+      }
+      if (request.method !== expectedMethod) {
+        return withCors(Response.json({ ok: false, error: 'Method not allowed' }, { status: 405 }), request);
+      }
+
+      const auth = await resolveVerifiedWalletId(request, env);
+      if (!auth.ok) {
+        return withCors(Response.json({ ok: false, error: 'Unauthorized' }, { status: auth.status }), request);
+      }
+
+      let playerId = auth.walletId;
+      if (!playerId) {
+        const rawGuest = url.searchParams.get('playerId')?.trim() || '';
+        if (!GUEST_ID_RE.test(rawGuest)) {
+          return withCors(Response.json({ ok: false, error: 'Authentication required for account wallets' }, { status: 401 }), request);
+        }
+        playerId = rawGuest;
+      }
+
+      const stub = env.PLAYER_WALLET.get(env.PLAYER_WALLET.idFromName(playerId));
+      const doRes = await stub.fetch(`https://internal${action}`, {
+        method: request.method,
+        headers: { 'Content-Type': 'application/json' },
+        body: request.method === 'POST' ? await request.text() : undefined,
+      });
+      return withCors(new Response(doRes.body, { status: doRes.status, headers: { 'Content-Type': 'application/json' } }), request);
+    }
+
+    if (url.pathname.startsWith('/api/payments/razorpay/')) {
+      if (request.method === 'OPTIONS') return withCors(new Response(null, { status: 204 }), request);
+      const isWebhook = url.pathname === '/api/payments/razorpay/webhook';
+      if (!isWebhook && !checkRateLimit(`pay:${getClientIp(request)}`, 20)) {
+        return withCors(Response.json({ ok: false, error: 'Too many payment requests. Please wait.' }, { status: 429 }), request);
+      }
+      let verifiedWalletId = null;
+      if (!isWebhook) {
+        const auth = await resolveVerifiedWalletId(request, env);
+        if (!auth.ok) {
+          return withCors(Response.json({ ok: false, error: 'Unauthorized' }, { status: auth.status }), request);
+        }
+        verifiedWalletId = auth.walletId;
+      }
+      const payRes = await handlePaymentRequest(request, url, env, verifiedWalletId);
+      if (payRes) return withCors(payRes, request);
     }
 
     const assetRes = await env.ASSETS.fetch(request);
@@ -85,7 +313,10 @@ export default {
 
     const headers = new Headers(assetRes.headers);
     headers.delete('X-Frame-Options');
-    headers.set('Content-Security-Policy', FRAME_ANCESTORS_CSP);
+    headers.set('Content-Security-Policy', HTML_CSP);
+    headers.set('X-Content-Type-Options', 'nosniff');
+    headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    headers.set('Permissions-Policy', 'camera=(), geolocation=(), payment=(self)');
     return new Response(assetRes.body, {
       status: assetRes.status,
       statusText: assetRes.statusText,
@@ -93,6 +324,8 @@ export default {
     });
   },
 };
+
+export { AccountDO, PlayerWalletDO };
 
 export class DontTrustRoomDO extends DurableObject {
   constructor(ctx, env) {
@@ -196,8 +429,10 @@ export class DontTrustRoomDO extends DurableObject {
 
     const codeMatch = url.pathname.match(/(\d{9})$/);
     const code = codeMatch?.[1] ?? '000000000';
-    const playerId = url.searchParams.get('pid')?.trim() || crypto.randomUUID();
-    const deviceId = url.searchParams.get('did')?.trim() || undefined;
+    const rawPid = url.searchParams.get('pid')?.trim() || '';
+    const rawDid = url.searchParams.get('did')?.trim() || '';
+    const playerId = rawPid.length > 0 && rawPid.length <= 64 ? rawPid : crypto.randomUUID();
+    const deviceId = rawDid.length > 0 && rawDid.length <= 64 ? rawDid : undefined;
     const playerName = url.searchParams.get('name') ?? undefined;
     const intent = url.searchParams.get('intent');
     const levelIndex = Number(url.searchParams.get('level') ?? 0);
@@ -264,7 +499,7 @@ export class DontTrustRoomDO extends DurableObject {
     }
 
     const meta = ws.deserializeAttachment();
-    const playerId = parsed.type === 'join' ? parsed.playerId : (meta?.playerId ?? '');
+    const playerId = meta?.playerId ?? '';
     if (!playerId) return;
 
     if (parsed.type === 'ping') {

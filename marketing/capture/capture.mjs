@@ -5,7 +5,7 @@ import { mkdirSync, rmSync, readFileSync, existsSync, writeFileSync } from 'node
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SHOTS } from './shots.mjs';
+const { SHOTS } = await import(process.env.SHOTS || './shots.mjs');
 
 const BASE = process.env.BASE || 'http://localhost:5174';
 const W = Number(process.env.W || 1080), H = Number(process.env.H || 1920);
@@ -91,7 +91,7 @@ while (queue.length) {
   await ctx.close();
   if (texFail && (tries[shot.id] = (tries[shot.id] || 0) + 1) < 4) { console.log(`  ${shot.id}: textures failed, retrying`); queue.unshift(shot); continue; }
   const mp4 = join(OUT, `${shot.id}.mp4`);
-  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', '30', '-i', join(dir, '%05d.jpg'), '-c:v', 'libx264', '-crf', '14', '-preset', 'slow', '-pix_fmt', 'yuv420p', mp4]);
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', '30', '-i', join(dir, '%05d.jpg'), '-c:v', 'libx264', '-crf', '14', '-preset', 'veryfast', '-threads', '2', '-pix_fmt', 'yuv420p', mp4]);
   console.log(`${shot.id}: ${n} frames in ${((Date.now() - t0) / 1000).toFixed(0)}s -> ${mp4}`);
 }
 await browser.close();

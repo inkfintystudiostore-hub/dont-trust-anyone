@@ -156,6 +156,10 @@ function sanitizeChatText(raw) {
   return clean ? clean.slice(0, 120) : '';
 }
 
+function isPlainObject(v) {
+  return Boolean(v && typeof v === 'object' && !Array.isArray(v));
+}
+
 export function handleRoomAction(record, playerId, msg, now = Date.now()) {
   const seatIndex = record.seats.findIndex((s) => s.playerId === playerId);
   const noop = { record, persist: false, broadcastSnapshots: false, relayToOthers: [], broadcast: [] };
@@ -217,7 +221,7 @@ export function handleRoomAction(record, playerId, msg, now = Date.now()) {
     }
     case 'state': {
       // Only Host (seat 0) pushes authoritative simulation snapshots.
-      if (seatIndex !== 0 || !record.started || !msg.state) return noop;
+      if (seatIndex !== 0 || !record.started || !isPlainObject(msg.state)) return noop;
       return {
         record,
         persist: false,
@@ -228,7 +232,7 @@ export function handleRoomAction(record, playerId, msg, now = Date.now()) {
     }
     case 'guest_state': {
       // Guest (seat 1) streams its authoritative local position when using WebSocket fallback.
-      if (seatIndex !== 1 || !record.started || !msg.state) return noop;
+      if (seatIndex !== 1 || !record.started || !isPlainObject(msg.state)) return noop;
       return {
         record,
         persist: false,
@@ -238,7 +242,7 @@ export function handleRoomAction(record, playerId, msg, now = Date.now()) {
       };
     }
     case 'rtc_signal': {
-      if (!msg.signal) return noop;
+      if (!isPlainObject(msg.signal) || (!msg.signal.sdp && !msg.signal.candidate)) return noop;
       return {
         record,
         persist: false,
@@ -259,7 +263,7 @@ export function handleRoomAction(record, playerId, msg, now = Date.now()) {
     }
     case 'event': {
       // Only Host (seat 0) broadcasts canonical simulation events (death, win, trap, doorWait, respawn).
-      if (seatIndex !== 0 || !record.started || !msg.event) return noop;
+      if (seatIndex !== 0 || !record.started || !isPlainObject(msg.event) || typeof msg.event.type !== 'string') return noop;
       let next = record;
       if (msg.event?.type === 'win' && Number.isFinite(msg.event.nextLevel)) {
         const curMax = record.maxLevelIndex ?? 0;

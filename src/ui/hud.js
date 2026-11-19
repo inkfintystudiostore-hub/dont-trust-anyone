@@ -109,6 +109,8 @@ export const hud = {
     if (leaveBtn) leaveBtn.hidden = !isCoop;
     const chatBtn = $('btn-chat');
     if (chatBtn) chatBtn.hidden = !isCoop;
+    const voiceBtn = $('btn-voice');
+    if (voiceBtn) voiceBtn.hidden = !isCoop;
     const pres = $('coop-presence');
     if (pres && !isCoop) pres.hidden = true;
     if (!isCoop) {

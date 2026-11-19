@@ -27,6 +27,7 @@ html, body {
 }
 canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 [hidden] { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 #iris {
   position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -305,3 +306,37 @@ body.touch .bubble { bottom: 168px; }
 .chat-send { width: auto; margin: 0; padding: 8px 13px; font-size: 13px; flex-shrink: 0; }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+.voice-pill.live {
+  background: #2b9348; color: #fff; border-color: #1b6b32;
+}
+.menu-card { max-width: 410px; }
+.menu-topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-bottom: 14px;
+}
+.account-pill {
+  font-size: 12.5px; padding: 6px 12px; max-width: 190px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.coin-pill {
+  background: linear-gradient(135deg, #fff6d6, #ffe394);
+  border: 1.5px solid #e6a817; color: #5c3b00;
+  padding: 5px 10px 5px 11px; font: 800 13.5px var(--font-mono);
+  box-shadow: 0 3px 10px rgba(230, 168, 23, .22);
+}
+.coin-pill:hover { background: linear-gradient(135deg, #fff9e3, #ffebad); }
+.coin-plus {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 999px;
+  background: #8b0d1a; color: #fff; font: 800 13px/1 var(--font-display);
+  margin-left: 2px;
+}
+.vip-tag {
+  background: #8b0d1a; color: #fff; font: 800 10px var(--font-display);
+  padding: 2px 6px; border-radius: 999px; letter-spacing: .04em;
+}
+.menu-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+.menu-row .btn { margin-bottom: 8px; }

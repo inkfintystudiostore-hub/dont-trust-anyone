@@ -4,6 +4,9 @@ dist/
 
 # launch video: regenerable media (capture.mjs + build.mjs recreate them)
 marketing/footage/
+marketing/footage-solo/
+marketing/solo-promo/
+marketing/thumbnails/
 marketing/launch-ad/assets/footage/
 marketing/launch-ad/renders/
 marketing/launch-ad/.hyperframes/

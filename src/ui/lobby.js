@@ -56,6 +56,7 @@ export function createCoopLobby(_levels, callbacks) {
     onEventSync: callbacks.onEventSync,
     onRestart: callbacks.onRestart,
     onEmote: callbacks.onEmote,
+    onRemoteAudio: callbacks.onRemoteAudio,
     onChat(msg) {
       appendLobbyChat(msg.senderName || 'Partner', msg.text, false);
       callbacks.onChat?.(msg);

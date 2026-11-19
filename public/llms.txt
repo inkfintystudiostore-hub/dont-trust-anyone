@@ -1,0 +1,27 @@
+# Don't Trust Anyone
+
+> Free-to-play 3D rage-bait troll platformer in the browser with 47 solo levels, 15 2-player online co-op levels, deceptive traps, and zero downloads.
+
+- Canonical URL: https://dta.inkfinitystudio.store/
+- How to Play Guide: https://dta.inkfinitystudio.store/how-to-play
+- Publisher: Inkfinity Studio (https://inkfinitystudio.store)
+- Contact: support@inkfinitystudio.store
+
+## Key Features & Benefits
+- **100% Free & Zero Download**: Runs instantly in desktop and mobile web browsers (WebGL / Three.js) with no installation.
+- **62 Handcrafted 3D Levels**: 47 Solo levels and 15 Couple Co-op levels across 5 themed worlds.
+- **2-Player Online Co-op**: Create a private room, share a 9-digit room code or invite link, and play together with real-time sync, quick chat, and VIP voice chat.
+- **Deceptive Troll Mechanics**: Fake win banners, fake checkpoints, disappearing floors, inverted controls, and hidden spikes.
+- **8 Unlockable 3D Outfits**: Momo, Naruto, Gojo, Goku, Doraemon, Princess, Dumpling, and Fairy.
+- **Cross-Device Controls**: Full keyboard support on desktop and an adaptive touch joystick on mobile.
+
+## Core Rules
+- **Solo Mode**: Guide Momo from the spawn platform to the exit door. Question every sign, floor, and checkpoint—the game actively tries to trick you.
+- **2-Player Co-op Mode**: Shared-fate co-op. Both players must reach the exit door (collecting keys or defusing bombs when required) to clear a level. If either player dies, both players restart together.
+
+## Modes & Worlds
+1. **Candy Meadow** (Solo)
+2. **Toy Factory** (Solo)
+3. **Haunted Bakery** (Solo)
+4. **Mind Games** (Solo)
+5. **Couple Co-op** (2-Player Online Co-op, Levels 48–62)

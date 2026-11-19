@@ -9,6 +9,7 @@ import {
   resolveWorkerHttpOrigin,
   resolveWorkerWsOrigin,
 } from './roomCode.js';
+import { encodeFastPacket, decodeFastPacket } from './binaryCodec.js';
 
 const NAME_KEY = 'dta.coop.name';
 const PID_KEY = 'dta.coop.pid';
@@ -113,7 +114,8 @@ export function createCoopSession(handlers) {
     if (dc && dc.readyState === 'open') {
       if (isStream(msg) && dc.bufferedAmount > 16_384) return;
       try {
-        dc.send(JSON.stringify(msg));
+        const bin = encodeFastPacket(msg);
+        dc.send(bin ?? JSON.stringify(msg));
         return;
       } catch { /* fallback to WebSocket */ }
     }
@@ -135,7 +137,12 @@ export function createCoopSession(handlers) {
 
   const dispatchFastMessage = (raw) => {
     let data;
-    try { data = JSON.parse(String(raw)); } catch { return; }
+    if (raw instanceof ArrayBuffer) {
+      data = decodeFastPacket(raw);
+      if (!data) return;
+    } else {
+      try { data = JSON.parse(String(raw)); } catch { return; }
+    }
     if (data.type === 'input') handlers.onGuestInput?.(data);
     else if (data.type === 'state') handlers.onStateSync?.(data.state);
     else if (data.type === 'guest_state') handlers.onGuestState?.(data.state);
@@ -148,6 +155,7 @@ export function createCoopSession(handlers) {
 
   const attachDataChannel = (channel) => {
     dc = channel;
+    channel.binaryType = 'arraybuffer';
     channel.addEventListener('open', () => {
       if (dc !== channel) return;
       emitNetStats();
@@ -183,6 +191,11 @@ export function createCoopSession(handlers) {
       });
       peer.addEventListener('datachannel', (ev) => {
         if (pc === peer) attachDataChannel(ev.channel);
+      });
+      peer.addEventListener('track', (ev) => {
+        if (pc === peer && ev.streams?.[0]) {
+          handlers.onRemoteAudio?.(ev.streams[0]);
+        }
       });
       if (isHost) {
         const channel = peer.createDataChannel('coop-fast', { ordered: false, maxRetransmits: 0 });
@@ -382,6 +395,7 @@ export function createCoopSession(handlers) {
     },
     isConnected: () => Boolean(socket && socket.readyState === WebSocket.OPEN),
     isP2P: () => Boolean(dc && dc.readyState === 'open'),
+    getPeerConnection: () => pc,
     setName: (name) => send({ type: 'set_name', name }),
     setLevel: (levelIndex) => send({ type: 'set_level', levelIndex }),
     startMatch: (levelIndex) => send({ type: 'start', levelIndex }),
