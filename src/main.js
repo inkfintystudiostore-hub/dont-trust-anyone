@@ -101,10 +101,6 @@ const ensureDefaultFullscreen = () => {
 hud.fullscreenIcon(isInFullscreen());
 if (!isFullscreenSupported()) hud.hideFullscreenBtn();
 subscribeFullscreenChange((fs) => hud.fullscreenIcon(fs));
-addEventListener('pointerdown', (e) => {
-  if (e.target.closest?.('#btn-fullscreen, #btn-chat, #touch, #game-chat, input, textarea, select')) return;
-  ensureDefaultFullscreen();
-}, { capture: true, passive: true });
 for (const evName of ['gesturestart', 'gesturechange', 'gestureend']) {
   addEventListener(evName, (e) => e.preventDefault(), { passive: false });
 }
@@ -126,7 +122,7 @@ try {
 } catch {
   renderer = new WebGLRenderer({ canvas, antialias: false, alpha: true });
 }
-renderer.setPixelRatio(Math.min(devicePixelRatio, isCoarse ? 1.25 : 1.75));
+renderer.setPixelRatio(Math.min(devicePixelRatio, isCoarse ? 1 : 1.75));
 renderer.outputColorSpace = SRGBColorSpace;
 renderer.toneMapping = ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
@@ -138,7 +134,7 @@ const camera = new PerspectiveCamera(38, 1, 0.1, 200);
 const hemi = new HemisphereLight('#ffffff', '#f3c9b5', 1.7);
 const sun = new DirectionalLight('#fff6ec', 2.3);
 sun.castShadow = true;
-sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.mapSize.set(isCoarse ? 512 : 1024, isCoarse ? 512 : 1024);
 Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 10, bottom: -6, near: 1, far: 40 });
 const rim = new DirectionalLight('#fff2e6', 0.85);
 scene.add(hemi, sun, sun.target, rim);
@@ -211,7 +207,10 @@ try {
   throw err;
 }
 $('loading').hidden = true;
-modelStore.preloadAll().catch(() => {});
+setTimeout(() => {
+  const next = LEVELS[startLevel + 1];
+  if (next) modelStore.ensure(modelsForLevel(next)).catch(() => {});
+}, 2000);
 
 let game = createGame(LEVELS, startLevel);
 let world = buildWorld(scene, game.level, models);
@@ -645,6 +644,8 @@ function leaveCoopToMenu() {
   $('play').focus();
 }
 
+let savedFog = null;
+
 function openMap() {
   if (coopRole === 'guest') {
     hud.toast('Host chooses levels in Co-op!', 1300);
@@ -668,9 +669,14 @@ function openMap() {
   confetti.mesh.visible = false;
   dust.mesh.visible = false;
   motes.mesh.visible = false;
+  savedFog = scene.fog;
   scene.fog = null;
   diorama.show(true);
   renderMapGrid();
+  resize();
+  const portrait = innerWidth < innerHeight;
+  const targetX = (mapWorld - 2) * (portrait ? 4.6 : 1.6);
+  camPos.set(targetX, portrait ? 12.5 : 9.2, portrait ? 16.5 : 11.5);
   $('map').hidden = false;
   $('map-play').focus();
 }
@@ -687,6 +693,7 @@ function closeMap(shouldRebuild = true) {
   dust.mesh.visible = true;
   motes.mesh.visible = true;
   if (shouldRebuild) rebuildWorld();
+  else scene.fog = savedFog;
 }
 
 $('play').addEventListener('click', () => {
@@ -734,6 +741,8 @@ $('skin-grid').addEventListener('click', (e) => {
   if (b) setSkin(b.dataset.skin).catch(() => hud.toast('Outfit load nahi hua, dobara try karo', 1500));
 });
 $('end-map').addEventListener('click', openMap);
+$('end-home').addEventListener('click', () => leaveCoopToMenu());
+$('btn-home').addEventListener('click', () => leaveCoopToMenu());
 $('btn-map').addEventListener('click', openMap);
 $('btn-chat').addEventListener('click', () => {
   const next = !hud.isChatOpen();
@@ -1102,11 +1111,13 @@ function frame(now) {
 
   if (mapOpen) {
     diorama.update(dt, time);
-    camPos.x += (0 - camPos.x) * damp(6, dt);
-    camPos.y += ((innerWidth < innerHeight ? 13 : 9.2) - camPos.y) * damp(6, dt);
-    camPos.z += ((innerWidth < innerHeight ? 16 : 11.5) - camPos.z) * damp(6, dt);
+    const portrait = innerWidth < innerHeight;
+    const targetX = (mapWorld - 2) * (portrait ? 4.6 : 1.6);
+    camPos.x += (targetX - camPos.x) * damp(6, dt);
+    camPos.y += ((portrait ? 12.5 : 9.2) - camPos.y) * damp(6, dt);
+    camPos.z += ((portrait ? 16.5 : 11.5) - camPos.z) * damp(6, dt);
     camera.position.copy(camPos);
-    camera.lookAt(0, 0, 0.3);
+    camera.lookAt(targetX * 0.85, portrait ? -1.6 : -0.6, portrait ? 1.2 : 0.8);
     hemi.intensity = 1.7;
     sun.intensity = 2.3;
     if (!document.hidden) renderer.render(scene, camera);

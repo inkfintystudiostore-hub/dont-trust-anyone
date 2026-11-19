@@ -135,14 +135,27 @@ canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: blo
   100% { transform: translate(-50%, 90px) rotate(14deg); opacity: 0; }
 }
 
-.overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(255,251,247,.55); backdrop-filter: blur(3px); z-index: 20; }
-.map-overlay { align-items: end; background: rgba(255,251,247,.16); backdrop-filter: none; padding-bottom: 20px; }
+.overlay {
+  position: fixed; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center;
+  padding: 16px; background: rgba(255,251,247,.55); backdrop-filter: blur(3px); z-index: 20;
+  overflow-y: auto; overscroll-behavior: contain;
+}
+.map-overlay {
+  align-items: end; background: rgba(255,251,247,.16); backdrop-filter: none;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+}
 .card {
   background: var(--bg); border: 1px solid #ecdcd0; border-radius: 20px; padding: 26px 26px 20px;
-  width: min(440px, 100%); text-align: center; box-shadow: 0 10px 30px rgba(31,25,22,.12);
+  width: min(440px, 100%); max-width: 100%; min-width: 0;
+  text-align: center; box-shadow: 0 10px 30px rgba(31,25,22,.12);
 }
-.map-card { width: min(520px, 100%); padding: 18px 20px 16px; }
-.map-head { display: flex; justify-content: space-between; align-items: center; text-align: left; margin-bottom: 10px; }
+.map-card {
+  width: min(520px, 100%); max-width: 100%; min-width: 0;
+  max-height: calc(100dvh - 28px); overflow-y: auto;
+  padding: 18px 20px 16px;
+}
+.map-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: left; margin-bottom: 10px; }
+.map-head > div { min-width: 0; flex: 1; }
 .map-head h2 { margin: 0; font: 800 22px var(--font-display); }
 .world-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 6px; margin-bottom: 10px; }
 .tab {
@@ -248,6 +261,23 @@ body.touch .bubble { bottom: 168px; }
   #touch .jump { width: 72px; height: 72px; }
   #touch .mini { width: 46px; height: 46px; }
   body.touch .bubble { bottom: 146px; }
+  .map-card { padding: 12px 14px 12px; border-radius: 16px; }
+  .map-head { margin-bottom: 8px; }
+  .map-head h2 { font-size: 18px; }
+  .world-tabs {
+    display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 6px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 2px;
+  }
+  .world-tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: 0 0 auto; white-space: nowrap; padding: 6px 10px; font-size: 11.5px; }
+  .level-grid { gap: 6px; margin-bottom: 10px; }
+  .lvl-btn { padding: 6px 2px; font-size: 13px; }
+  .lvl-btn small { font-size: 10px; }
+}
+
+@media (max-height: 500px) {
+  .map-overlay { align-items: center; padding: 10px 14px; }
+  .map-card { padding: 12px 16px; max-height: calc(100dvh - 20px); }
 }
 
 #btn-chat { position: relative; }

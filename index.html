@@ -150,6 +150,9 @@
   <div id="hud" hidden>
     <div class="hud-left">
       <div class="pill" id="level-name"></div>
+      <button class="pill btn-pill" id="btn-home" title="Home" aria-label="Home">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg>
+      </button>
       <button class="pill btn-pill" id="btn-map" title="Level Map (M / Esc)" aria-label="Level Map">
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 7v13l6-3 6 3 6-3V4l-6 3-6-3Z"/><path d="M9 4v13M15 7v13"/></svg>
       </button>
@@ -345,6 +348,7 @@
       <p id="end-wait-guest" class="sub" hidden data-i18n="coop.waitAgain"></p>
       <button id="again" class="btn" data-i18n="end.again"></button>
       <button id="end-map" class="btn ghost" data-i18n="menu.map"></button>
+      <button id="end-home" class="btn ghost" data-i18n="menu.home"></button>
       <button id="end-leave" class="btn ghost" hidden data-i18n="coop.leave"></button>
       <div id="end-ad-slot"></div>
     </div>

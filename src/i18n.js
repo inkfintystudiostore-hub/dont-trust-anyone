@@ -13,6 +13,7 @@ const STRINGS = {
     'menu.sub': 'Floor pe bharosa mat karna. Darwaze pe bhi nahi.',
     'menu.solo': 'Solo khelo',
     'menu.map': 'Level Map',
+    'menu.home': 'Home',
     'menu.online': 'Dost ke saath (2P Co-op)',
     'menu.keys': '<kbd>←</kbd> <kbd>→</kbd> chalo · <kbd>↓</kbd> fast-fall · <kbd>Space</kbd> koodo · <kbd>R</kbd> restart · <kbd>M</kbd> map',
     'coop.title': '2-Player Co-op Room',

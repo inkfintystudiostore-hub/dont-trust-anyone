@@ -30,6 +30,9 @@ export function createAdBanner(position = 'bottom', adSlotId = '') {
     'align-items:center',
     'justify-content:center',
     'width:100%',
+    'max-width:100%',
+    'min-width:0',
+    'overflow:hidden',
     'min-height:40px',
     'padding:4px 10px',
     `background:${promo.bg}`,
@@ -62,8 +65,8 @@ export function createAdBanner(position = 'bottom', adSlotId = '') {
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     link.style.cssText =
-      'display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;color:inherit;text-decoration:none;';
-    link.innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><strong>${promo.badge}</strong> · ${promo.text}</span><span style="flex-shrink:0;background:#fff;padding:2px 8px;border-radius:999px;font-size:10px;">${promo.cta}</span>`;
+      'display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-width:0;overflow:hidden;color:inherit;text-decoration:none;';
+    link.innerHTML = `<span style="min-width:0;flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><strong>${promo.badge}</strong> · ${promo.text}</span><span style="flex-shrink:0;background:#fff;padding:2px 8px;border-radius:999px;font-size:10px;">${promo.cta}</span>`;
     aside.appendChild(link);
   }
 
