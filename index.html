@@ -6,6 +6,9 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Don't Trust">
+  <meta name="theme-color" content="#8b0d1a">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <title>Don't Trust Anyone — Free 3D Troll Platformer | Solo &amp; 2P Co-op Online</title>
   <meta name="description" content="Play Don't Trust Anyone free in your browser! 62 chaotic 3D troll platformer levels, 2-player online co-op, fake traps, and zero downloads.">
@@ -231,6 +234,10 @@
         <button id="open-skins" class="btn ghost">🎭 Outfit chuno</button>
       </div>
       <button id="open-coop" class="btn ghost" data-i18n="menu.online"></button>
+      <button id="install-app" class="btn ghost install-btn" type="button">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        <span>Install App · Add to Home Screen</span>
+      </button>
       <div id="menu-ad-slot"></div>
       <p class="keys" data-i18n="menu.keys"></p>
       <footer class="legal-note" style="margin-top:12px;font-size:11px;opacity:.75;line-height:1.4;">
@@ -358,6 +365,17 @@
   </div>
 
   <div id="loading" class="overlay"><div class="card"><h1 data-i18n="loading.title">Loading…</h1></div></div>
+
+  <section id="install-help" class="overlay" role="dialog" aria-modal="true" aria-labelledby="install-help-title" hidden>
+    <div class="card install-help-card">
+      <div class="map-head">
+        <h2 id="install-help-title">Install App</h2>
+        <button id="install-help-close" class="pill btn-pill" type="button" aria-label="Close">✕</button>
+      </div>
+      <p class="sub">Install <strong>Don't Trust Anyone</strong> on your home screen for one-tap launch and fullscreen play:</p>
+      <ol id="install-help-steps" class="install-steps"></ol>
+    </div>
+  </section>
 
   <script type="module" src="/src/main.js"></script>
 </body>

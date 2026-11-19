@@ -340,3 +340,18 @@ body.touch .bubble { bottom: 168px; }
   display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
 }
 .menu-row .btn { margin-bottom: 8px; }
+.install-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border-style: dashed; border-color: #c98f95; color: #8b0d1a;
+  background: rgba(139, 13, 26, 0.04); font-size: 13.5px; padding: 10px 14px;
+}
+.install-btn[hidden] { display: none; }
+.install-btn:hover:not(:disabled) {
+  background: rgba(139, 13, 26, 0.09); border-color: #8b0d1a;
+}
+.install-help-card { max-width: 400px; text-align: left; }
+.install-help-card .sub { margin-bottom: 12px; }
+.install-steps {
+  margin: 0; padding-left: 20px; display: grid; gap: 8px;
+  font-size: 13.5px; line-height: 1.45; color: var(--ink);
+}

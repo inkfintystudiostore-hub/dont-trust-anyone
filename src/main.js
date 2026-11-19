@@ -29,6 +29,7 @@ import {
   exitGameFullscreen, isFullscreenSupported, isInFullscreen,
   requestGameFullscreen, subscribeFullscreenChange,
 } from './utils/fullscreen.js';
+import { initPwa } from './pwa.js';
 
 const FIXED = 1 / 60;
 const TAN_HALF_38 = Math.tan((38 * Math.PI) / 360);
@@ -42,6 +43,9 @@ const $ = (id) => document.getElementById(id);
 
 applyI18n();
 restoreAuthSession();
+initPwa({
+  onInstalled: () => hud.toast('App installed! Home screen se launch karo 🎉', 2600),
+});
 $('open-auth')?.addEventListener('click', openAuthModal);
 $('open-shop')?.addEventListener('click', () => openShopModal());
 const adSlotTop = import.meta.env.VITE_ADSENSE_SLOT_TOP || '';
