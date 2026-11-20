@@ -379,6 +379,19 @@ body.touch .bubble { bottom: 168px; }
 .install-btn:hover:not(:disabled) {
   background: rgba(139, 13, 26, 0.09); border-color: #8b0d1a;
 }
+.menu-guide {
+  margin-top: 12px; padding: 12px 14px; border-radius: 12px;
+  background: #fff7f2; border: 1px solid #eadad0; text-align: left;
+  font-size: 12px; line-height: 1.5; color: #5b4f49;
+}
+.menu-guide h2 {
+  margin: 0 0 6px; font: 800 13.5px var(--font-display); color: #8b0d1a;
+}
+.menu-guide p { margin: 0 0 6px; }
+.menu-guide ul { margin: 0 0 6px; padding-left: 16px; }
+.menu-guide li { margin-bottom: 3px; }
+.menu-guide-more { margin-bottom: 0; font-size: 11.5px; }
+.menu-guide a { color: #8b0d1a; font-weight: 600; }
 .install-help-card { max-width: 400px; text-align: left; }
 .install-help-card .sub { margin-bottom: 12px; }
 .install-steps {

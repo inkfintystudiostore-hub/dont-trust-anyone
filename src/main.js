@@ -48,16 +48,15 @@ initPwa({
 });
 $('open-auth')?.addEventListener('click', openAuthModal);
 $('open-shop')?.addEventListener('click', () => openShopModal());
-const adSlotTop = import.meta.env.VITE_ADSENSE_SLOT_TOP || '';
 const adSlotBottom = import.meta.env.VITE_ADSENSE_SLOT_BOTTOM || '';
 const menuAdSlot = $('menu-ad-slot');
 if (menuAdSlot) menuAdSlot.appendChild(createAdBanner('bottom', adSlotBottom));
 const mapAdSlot = $('map-ad-slot');
-if (mapAdSlot) mapAdSlot.appendChild(createAdBanner('top', adSlotTop));
+if (mapAdSlot) mapAdSlot.appendChild(createAdBanner('top'));
 const endAdSlot = $('end-ad-slot');
-if (endAdSlot) endAdSlot.appendChild(createAdBanner('bottom', adSlotBottom));
+if (endAdSlot) endAdSlot.appendChild(createAdBanner('bottom'));
 const skinsAdSlot = $('skins-ad-slot');
-if (skinsAdSlot) skinsAdSlot.appendChild(createAdBanner('top', adSlotTop));
+if (skinsAdSlot) skinsAdSlot.appendChild(createAdBanner('top'));
 subscribeAuth((st) => {
   const btn = $('open-auth');
   if (btn) btn.textContent = st.user ? `👤 ${st.user.displayName}` : '👤 Sign In';

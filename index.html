@@ -141,7 +141,7 @@
       </ul>
     </section>
     <footer>
-      <p>Published by <a href="https://inkfinitystudio.store">Inkfinity Studio</a> · <a href="/how-to-play">How to Play</a> · <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a> · Contact: <a href="mailto:support@inkfinitystudio.store">support@inkfinitystudio.store</a></p>
+      <p>Published by <a href="https://inkfinitystudio.store">Inkfinity Studio</a> · <a href="/how-to-play">How to Play</a> · <a href="/about">About</a> · <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a> · Contact: <a href="mailto:support@inkfinitystudio.store">support@inkfinitystudio.store</a></p>
     </footer>
   </main>
   <canvas id="game" aria-label="Game"></canvas>
@@ -234,7 +234,7 @@
       <button id="play" class="btn" data-i18n="menu.solo"></button>
       <div class="menu-row">
         <button id="open-map" class="btn ghost" data-i18n="menu.map"></button>
-        <button id="open-skins" class="btn ghost">🎭 Outfit chuno</button>
+        <button id="open-skins" class="btn ghost">🎭 Choose Outfit</button>
       </div>
       <button id="open-coop" class="btn ghost" data-i18n="menu.online"></button>
       <button id="install-app" class="btn ghost install-btn" type="button">
@@ -243,9 +243,20 @@
       </button>
       <div id="menu-ad-slot"></div>
       <p class="keys" data-i18n="menu.keys"></p>
+      <section class="menu-guide" aria-label="About Don't Trust Anyone">
+        <h2>About the Game</h2>
+        <p><strong>Don't Trust Anyone</strong> is a free 3D troll platformer with <strong>62 handcrafted levels</strong> across 5 worlds: Candy Meadow, Toy Factory, Haunted Bakery, Mind Games, and Couple Co-op.</p>
+        <ul>
+          <li><strong>Deceptive Traps:</strong> Expect vanishing floors, fake win banners, hidden spikes, and gravity flips.</li>
+          <li><strong>2-Player Online Co-op:</strong> Share a 9-digit room code or invite link—if one player dies, both restart.</li>
+          <li><strong>Controls:</strong> Move with Arrow keys or A/D, Jump with Space, Fast-fall with Down, Restart with R, or use the mobile touch joystick.</li>
+        </ul>
+        <p class="menu-guide-more">Read the full <a href="/how-to-play">How to Play Guide</a> or learn more <a href="/about">About Inkfinity Studio</a>.</p>
+      </section>
       <footer class="legal-note" style="margin-top:12px;font-size:11px;opacity:.75;line-height:1.4;">
         <strong>Inkfinity Studio</strong> (<a href="https://inkfinitystudio.store" target="_blank" rel="noopener noreferrer">inkfinitystudio.store</a>) ·
         <a href="/how-to-play">How to Play</a> ·
+        <a href="/about">About</a> ·
         <a href="/privacy">Privacy Policy</a> ·
         <a href="/terms">Terms</a> ·
         <a href="https://www.google.com/settings/ads" target="_blank" rel="noopener noreferrer">Ad Settings</a> ·
@@ -283,7 +294,7 @@
 
       <div id="coop-join-pane" hidden>
         <div class="join-row">
-          <input id="coop-join-input" class="field" type="text" autocomplete="off" aria-label="Room code or invite link" placeholder="482-910-375 ya invite link">
+          <input id="coop-join-input" class="field" type="text" autocomplete="off" aria-label="Room code or invite link" placeholder="482-910-375 or invite link">
           <button id="coop-join-btn" class="btn join-go" type="button" data-i18n="coop.joinBtn"></button>
         </div>
       </div>
@@ -311,7 +322,7 @@
   <section id="skins" class="overlay" role="dialog" aria-modal="true" aria-label="Choose Outfit" hidden>
     <div class="card skins-card">
       <div class="map-head">
-        <h2>Outfit chuno</h2>
+        <h2>Choose Outfit</h2>
         <button id="skins-close" class="pill btn-pill" aria-label="Back">✕</button>
       </div>
       <div class="skin-grid" id="skin-grid"></div>
