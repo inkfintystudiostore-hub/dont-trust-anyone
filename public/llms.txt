@@ -12,7 +12,7 @@
 - **62 Handcrafted 3D Levels**: 47 Solo levels and 15 Couple Co-op levels across 5 themed worlds.
 - **2-Player Online Co-op**: Create a private room, share a 9-digit room code or invite link, and play together with real-time sync, quick chat, and VIP voice chat.
 - **Deceptive Troll Mechanics**: Fake win banners, fake checkpoints, disappearing floors, inverted controls, and hidden spikes.
-- **8 Unlockable 3D Outfits**: Momo, Naruto, Gojo, Goku, Doraemon, Princess, Dumpling, and Fairy.
+- **8 Unlockable 3D Outfits**: Momo, Shinobi, Void Mage, Super Fighter, Robo-Cat, Princess, Dumpling, and Fairy.
 - **Cross-Device Controls**: Full keyboard support on desktop and an adaptive touch joystick on mobile.
 
 ## Core Rules
