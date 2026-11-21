@@ -312,6 +312,9 @@ export default {
     if (!contentType.includes('text/html')) return assetRes;
 
     const headers = new Headers(assetRes.headers);
+    if (!contentType.toLowerCase().includes('charset=')) {
+      headers.set('Content-Type', 'text/html; charset=utf-8');
+    }
     headers.delete('X-Frame-Options');
     headers.set('Content-Security-Policy', HTML_CSP);
     headers.set('X-Content-Type-Options', 'nosniff');
